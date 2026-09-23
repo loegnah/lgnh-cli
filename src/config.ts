@@ -3,13 +3,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export interface LgnhConfig {
-  openrouter?: {
-    key?: string;
-    model?: string;
-  };
+  model?: string;
 }
 
-export const DEFAULT_MODEL = "google/gemini-2.5-flash";
+export const DEFAULT_MODEL = "@tiny";
 
 export function getConfigPath(): string {
   if (process.env.LGNH_CONFIG_PATH) return process.env.LGNH_CONFIG_PATH;
@@ -33,15 +30,6 @@ export function saveConfig(config: LgnhConfig): void {
   writeFileSync(getConfigPath(), JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
 }
 
-export function getOpenRouterKey(): string {
-  const key = loadConfig().openrouter?.key;
-  if (!key) {
-    console.error("OpenRouter API key is not set.\nRun: lgnh config set-key <key>");
-    process.exit(1);
-  }
-  return key;
-}
-
-export function getOpenRouterModel(): string {
-  return loadConfig().openrouter?.model || DEFAULT_MODEL;
+export function getModel(): string {
+  return loadConfig().model || DEFAULT_MODEL;
 }

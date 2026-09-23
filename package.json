@@ -1,7 +1,7 @@
 {
   "name": "lgnh",
   "version": "0.1.0",
-  "description": "Git diff-based commit messages via OpenRouter",
+  "description": "Git diff-based commit messages via OMP",
   "bin": {
     "lgnh": "./bin/lgnh-cli.ts",
     "lgnh-cli": "./bin/lgnh-cli.ts"
