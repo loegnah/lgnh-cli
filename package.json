@@ -1,0 +1,21 @@
+{
+  "name": "lgnh",
+  "version": "0.1.0",
+  "description": "Git diff-based commit messages via OpenRouter",
+  "bin": {
+    "lgnh": "./bin/lgnh-cli.ts",
+    "lgnh-cli": "./bin/lgnh-cli.ts"
+  },
+  "scripts": {
+    "lint": "oxlint && oxfmt --check",
+    "lint:write": "oxlint --fix && oxfmt",
+    "typecheck": "tsc --noEmit",
+    "check": "oxlint --fix && oxfmt && tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "oxfmt": "^0.59.0",
+    "oxlint": "^1.74.0",
+    "typescript": "^7.0.2"
+  }
+}
