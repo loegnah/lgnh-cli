@@ -4,7 +4,7 @@ import pc from "picocolors";
 
 import { DEFAULT_MODEL, getConfigPath, getModel, loadConfig, saveConfig } from "./config.ts";
 import { executeCommit, getStagedDiff, runProjectVerification, StepError } from "./git.ts";
-import { generateCommitMessage } from "./omp.ts";
+import { analyzeContext, generateCommitMessage } from "./omp.ts";
 
 async function runStep<T>(
   s: SpinnerResult,
@@ -51,6 +51,21 @@ async function runCommit(verify: boolean, edit: boolean): Promise<void> {
       p.outro(pc.dim("워킹 트리가 깨끗합니다."));
       return;
     }
+    const metrics = analyzeContext(staged.stat, staged.diff);
+    p.log.info(
+      pc.bold("컨텍스트 토큰 요약:\n") +
+        pc.dim("  ├─ diff:   ") +
+        pc.yellow(`${metrics.diff.tokens.toLocaleString()} tokens`) +
+        pc.dim(` (${metrics.diff.chars.toLocaleString()} chars)\n`) +
+        pc.dim("  ├─ stat:   ") +
+        pc.yellow(`${metrics.stat.tokens.toLocaleString()} tokens`) +
+        pc.dim(` (${metrics.stat.chars.toLocaleString()} chars)\n`) +
+        pc.dim("  ├─ prompt: ") +
+        pc.yellow(`${metrics.prompt.tokens.toLocaleString()} tokens`) +
+        pc.dim(` (${metrics.prompt.chars.toLocaleString()} chars)\n`) +
+        pc.dim("  └─ total:  ") +
+        pc.cyan(pc.bold(`${metrics.total.tokens.toLocaleString()} tokens`)),
+    );
 
     const model = getModel();
     const message = await runStep(
