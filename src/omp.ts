@@ -46,10 +46,15 @@ function stripFences(text: string): string {
     .trim();
 }
 
+export interface CommitMessageResult {
+  message: string;
+  resolvedModel: string;
+}
+
 export async function generateCommitMessage(
   diffText: string,
   onFallback?: (fromModel: string, toModel: string) => void,
-): Promise<string> {
+): Promise<CommitMessageResult> {
   const models = getModelCandidates();
 
   for (const [i, model] of models.entries()) {
@@ -57,6 +62,8 @@ export async function generateCommitMessage(
       [
         "omp",
         "-p",
+        "--mode",
+        "json",
         "--no-tools",
         "--no-skills",
         "--no-rules",
@@ -90,11 +97,34 @@ export async function generateCommitMessage(
       throw new StepError(`OMP failed (exit code ${exitCode})`, stderr.trim() || undefined);
     }
 
-    const content = stripFences(output);
-    if (!content) {
+    let rawText = "";
+    let resolvedModel = model;
+
+    for (const line of output.trim().split("\n")) {
+      if (!line) continue;
+      try {
+        const data = JSON.parse(line);
+        if (data.type === "message_end" && data.message?.role === "assistant") {
+          const texts = data.message.content
+            ?.filter((c: { type: string; text?: string }) => c.type === "text" && c.text)
+            .map((c: { text: string }) => c.text);
+          if (texts && texts.length > 0) {
+            rawText = texts.join("\n");
+          }
+          if (data.message.provider && data.message.model) {
+            resolvedModel = `${data.message.provider}/${data.message.model}`;
+          } else if (data.message.model) {
+            resolvedModel = data.message.model;
+          }
+        }
+      } catch {}
+    }
+
+    const message = stripFences(rawText || output);
+    if (!message) {
       throw new StepError("OMP returned an empty response");
     }
-    return content;
+    return { message, resolvedModel };
   }
 
   throw new StepError("No available models found");

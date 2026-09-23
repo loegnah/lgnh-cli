@@ -68,10 +68,10 @@ async function runCommit(verify: boolean, edit: boolean): Promise<void> {
     );
 
     const initialModel = getModel();
-    const message = await runStep(
+    const { message, resolvedModel } = await runStep(
       s,
       `Generating message... (${pc.cyan(initialModel)})`,
-      "Generated message",
+      ({ resolvedModel }) => `Generated message (${pc.cyan(resolvedModel)})`,
       () =>
         generateCommitMessage(`${staged.stat}\n\n${staged.diff}`, (fromModel, toModel) => {
           s.stop(`${pc.dim(fromModel)} 모델 없음 → ${pc.cyan(toModel)} 사용`);
