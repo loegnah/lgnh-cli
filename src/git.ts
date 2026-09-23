@@ -9,20 +9,33 @@ interface PackageJson {
 
 const MAX_DIFF_CHARS = 40 * 1024;
 
-export async function runProjectVerification(): Promise<void> {
-  const root = (await $`git rev-parse --show-toplevel`.text()).trim();
+export class StepError extends Error {
+  constructor(
+    message: string,
+    public readonly detail?: string,
+  ) {
+    super(message);
+  }
+}
+
+export async function runProjectVerification(): Promise<string[]> {
+  const root = (await $`git rev-parse --show-toplevel`.quiet().text()).trim();
   const pkgPath = join(root, "package.json");
-  if (!existsSync(pkgPath)) return;
+  if (!existsSync(pkgPath)) return [];
   const pkg: PackageJson = JSON.parse(readFileSync(pkgPath, "utf-8"));
   const scripts = pkg.scripts ?? {};
   const targets = scripts.check ? ["check"] : ["lint", "typecheck"].filter((s) => scripts[s]);
   for (const t of targets) {
-    const code = await $`bun run ${t}`.cwd(root).nothrow();
-    if (code.exitCode !== 0) {
-      console.error(`Verification failed: bun run ${t}`);
-      process.exit(1);
+    const res = await $`bun run ${t}`.cwd(root).nothrow().quiet();
+    if (res.exitCode !== 0) {
+      const detail = [res.stdout.toString(), res.stderr.toString()]
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+      throw new StepError(`프로젝트 검증 실패: bun run ${t}`, detail);
     }
   }
+  return targets;
 }
 
 function stripDiffMetadata(raw: string): string {
@@ -38,7 +51,7 @@ function stripDiffMetadata(raw: string): string {
 
 export async function getStagedDiff(): Promise<{ diff: string; stat: string } | null> {
   await $`git add -A`.nothrow().quiet();
-  const status = (await $`git status -s`.text()).trim();
+  const status = (await $`git status -s`.quiet().text()).trim();
   if (!status) return null;
   const proc = Bun.spawn(
     [
@@ -54,18 +67,42 @@ export async function getStagedDiff(): Promise<{ diff: string; stat: string } | 
       ":(exclude)*.min.*",
       ":(exclude)*.map",
     ],
-    { stdout: "pipe" },
+    { stdout: "pipe", stderr: "pipe" },
   );
-  let diff = stripDiffMetadata(await new Response(proc.stdout).text());
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (exitCode !== 0) {
+    throw new StepError("변경사항 diff 조회 실패", stderr.trim() || undefined);
+  }
+  let diff = stripDiffMetadata(stdout);
   if (diff.length > MAX_DIFF_CHARS)
     diff = diff.slice(0, MAX_DIFF_CHARS) + "\n[diff truncated for length]";
-  const stat = await $`git diff --cached --stat`.text();
+  const stat = await $`git diff --cached --stat`.quiet().text();
   return { diff, stat };
 }
 
 export async function executeCommit(message: string, edit?: boolean): Promise<void> {
   const args = edit ? ["commit", "-e", "-m", message] : ["commit", "-m", message];
-  const proc = Bun.spawn(["git", ...args], { stdio: ["inherit", "inherit", "inherit"] });
-  const code = await proc.exited;
-  if (code !== 0) process.exit(code);
+  if (edit) {
+    const proc = Bun.spawn(["git", ...args], { stdio: ["inherit", "inherit", "inherit"] });
+    const code = await proc.exited;
+    if (code !== 0) {
+      throw new StepError(`Git 커밋 실패 (종료 코드: ${code})`);
+    }
+    return;
+  }
+
+  const proc = Bun.spawn(["git", ...args], { stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (code !== 0) {
+    const detail = (stderr || stdout).trim();
+    throw new StepError("Git 커밋 생성 실패", detail);
+  }
 }

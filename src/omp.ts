@@ -1,4 +1,5 @@
 import { getModel } from "./config.ts";
+import { StepError } from "./git.ts";
 
 const COMMIT_SYSTEM_PROMPT = `Generate a git commit message. English only.
 Use a Conventional Commits prefix: feat:, fix:, chore:, refactor:, docs:, test:, style:.
@@ -33,20 +34,25 @@ export async function generateCommitMessage(diffText: string): Promise<string> {
       "--",
       diffText,
     ],
-    { stderr: "ignore" },
+    { stdout: "pipe", stderr: "pipe" },
   );
 
-  const output = await new Response(proc.stdout).text();
-  const exitCode = await proc.exited;
+  const [output, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
 
   if (exitCode !== 0) {
-    throw new Error(`OMP failed with exit code ${exitCode}`);
+    throw new StepError(
+      `AI 커밋 메시지 생성 실패 (OMP 종료 코드: ${exitCode})`,
+      stderr.trim() || undefined,
+    );
   }
 
   const content = stripFences(output);
   if (!content) {
-    throw new Error("OMP returned an empty response");
+    throw new StepError("AI 커밋 메시지 생성 실패: OMP에서 빈 응답을 반환했습니다.");
   }
-
   return content;
 }

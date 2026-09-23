@@ -13,6 +13,10 @@
     "check": "oxlint --fix && oxfmt && tsc --noEmit",
     "package": "bun build --compile --minify bin/lgnh-cli.ts --outfile dist/lgnh"
   },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "picocolors": "^1.1.1"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "oxfmt": "^0.59.0",

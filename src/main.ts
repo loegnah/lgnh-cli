@@ -1,20 +1,88 @@
+import * as p from "@clack/prompts";
+import type { SpinnerResult } from "@clack/prompts";
+import pc from "picocolors";
+
 import { DEFAULT_MODEL, getConfigPath, getModel, loadConfig, saveConfig } from "./config.ts";
-import { executeCommit, getStagedDiff, runProjectVerification } from "./git.ts";
+import { executeCommit, getStagedDiff, runProjectVerification, StepError } from "./git.ts";
 import { generateCommitMessage } from "./omp.ts";
 
-async function runCommit(verify: boolean, edit: boolean): Promise<void> {
+async function runStep<T>(
+  s: SpinnerResult,
+  startText: string,
+  stopText: string | ((val: T) => string),
+  fn: () => Promise<T>,
+): Promise<T> {
+  s.start(startText);
   try {
-    if (verify) await runProjectVerification();
-    const staged = await getStagedDiff();
+    const res = await fn();
+    s.stop(typeof stopText === "function" ? stopText(res) : stopText);
+    return res;
+  } catch (err) {
+    s.error(pc.red("작업 실패"));
+    throw err;
+  }
+}
+
+async function runCommit(verify: boolean, edit: boolean): Promise<void> {
+  p.intro(verify ? pc.bold("lgnh commit") : pc.bold("lgnh commit-fast"));
+  const s = p.spinner();
+
+  try {
+    if (verify) {
+      await runStep(
+        s,
+        "프로젝트 검증 중...",
+        (targets) =>
+          targets.length > 0
+            ? `프로젝트 검증 완료 (${pc.dim(targets.join(", "))})`
+            : "프로젝트 검증 건너뜀 (검증 스크립트 없음)",
+        runProjectVerification,
+      );
+    }
+
+    const staged = await runStep(
+      s,
+      "변경사항 확인 중...",
+      (val) => (val ? "변경사항 확인 및 스테이징 완료" : "커밋할 변경사항 없음"),
+      getStagedDiff,
+    );
+
     if (!staged) {
-      console.log("Nothing to commit: working tree clean.");
+      p.outro(pc.dim("워킹 트리가 깨끗합니다."));
       return;
     }
-    const message = await generateCommitMessage(`${staged.stat}\n\n${staged.diff}`);
-    console.log(message);
-    await executeCommit(message, edit);
+
+    const model = getModel();
+    const message = await runStep(
+      s,
+      `AI 커밋 메시지 생성 중... (${pc.cyan(model)})`,
+      "AI 커밋 메시지 생성 완료",
+      () => generateCommitMessage(`${staged.stat}\n\n${staged.diff}`),
+    );
+
+    p.note(message, "커밋 메시지");
+
+    if (edit) {
+      p.log.info("커밋 메시지 편집을 위해 에디터를 엽니다...");
+      await executeCommit(message, true);
+      p.outro(pc.green("커밋이 완료되었습니다."));
+    } else {
+      await runStep(s, "Git 커밋 생성 중...", "Git 커밋 생성 완료", () =>
+        executeCommit(message, false),
+      );
+      p.outro(pc.green("커밋이 완료되었습니다."));
+    }
   } catch (err) {
-    console.error(err instanceof Error ? err.message : err);
+    if (err instanceof StepError) {
+      p.cancel(pc.red(err.message));
+      if (err.detail) {
+        console.error(`\n${err.detail}\n`);
+      }
+    } else if (err instanceof Error) {
+      p.cancel(pc.red(err.message));
+    } else {
+      p.cancel(pc.red(String(err)));
+    }
     process.exit(1);
   }
 }
