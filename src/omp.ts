@@ -4,10 +4,11 @@ import { getModelCandidates } from "./config.ts";
 import { StepError } from "./git.ts";
 
 const COMMIT_SYSTEM_PROMPT = `Generate a git commit message. English only.
-Use a Conventional Commits prefix: feat:, fix:, chore:, refactor:, docs:, test:, style:.
-Subject line under 72 characters.
-For complex changes only, add an empty line then concise bullet points starting with "- ".
-Return only the raw commit message, no backticks, no code fences, no explanations.`;
+Format: <type>(<scope>): <subject> (under 72 chars)
+Types: feat, fix, chore, refactor, docs, test, style
+Scope: lowercase keyword of changed area
+Complex changes: empty line then "- " bullet points
+Return raw commit message only, no markdown, no explanations.`;
 
 export interface ContextItemMetrics {
   tokens: number;
