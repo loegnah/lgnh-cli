@@ -7,6 +7,7 @@ export interface LgnhConfig {
 }
 
 export const DEFAULT_MODEL = "@commit";
+export const FALLBACK_MODELS = ["@commit", "@tiny", "@smol"] as const;
 
 export function getConfigPath(): string {
   if (process.env.LGNH_CONFIG_PATH) return process.env.LGNH_CONFIG_PATH;
@@ -32,4 +33,11 @@ export function saveConfig(config: LgnhConfig): void {
 
 export function getModel(): string {
   return loadConfig().model || DEFAULT_MODEL;
+}
+
+export function getModelCandidates(): string[] {
+  const model = getModel();
+  return model === DEFAULT_MODEL
+    ? [...FALLBACK_MODELS]
+    : [model, ...FALLBACK_MODELS.filter((m) => m !== model)];
 }

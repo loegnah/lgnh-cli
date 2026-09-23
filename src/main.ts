@@ -67,12 +67,16 @@ async function runCommit(verify: boolean, edit: boolean): Promise<void> {
         pc.cyan(pc.bold(`${metrics.total.tokens.toLocaleString()} tokens`)),
     );
 
-    const model = getModel();
+    const initialModel = getModel();
     const message = await runStep(
       s,
-      `Generating message... (${pc.cyan(model)})`,
+      `Generating message... (${pc.cyan(initialModel)})`,
       "Generated message",
-      () => generateCommitMessage(`${staged.stat}\n\n${staged.diff}`),
+      () =>
+        generateCommitMessage(`${staged.stat}\n\n${staged.diff}`, (fromModel, toModel) => {
+          s.stop(`${pc.dim(fromModel)} 모델 없음 → ${pc.cyan(toModel)} 사용`);
+          s.start(`Generating message... (${pc.cyan(toModel)})`);
+        }),
     );
 
     p.note(message, "Commit message");

@@ -1,6 +1,6 @@
 import { countTokens } from "gpt-tokenizer";
 
-import { getModel } from "./config.ts";
+import { getModelCandidates } from "./config.ts";
 import { StepError } from "./git.ts";
 
 const COMMIT_SYSTEM_PROMPT = `Generate a git commit message. English only.
@@ -46,40 +46,56 @@ function stripFences(text: string): string {
     .trim();
 }
 
-export async function generateCommitMessage(diffText: string): Promise<string> {
-  const proc = Bun.spawn(
-    [
-      "omp",
-      "-p",
-      "--no-tools",
-      "--no-skills",
-      "--no-rules",
-      "--no-extensions",
-      "--no-session",
-      "--no-title",
-      "--system-prompt",
-      COMMIT_SYSTEM_PROMPT,
-      "--model",
-      getModel(),
-      "--",
-      diffText,
-    ],
-    { stdout: "pipe", stderr: "pipe" },
-  );
+export async function generateCommitMessage(
+  diffText: string,
+  onFallback?: (fromModel: string, toModel: string) => void,
+): Promise<string> {
+  const models = getModelCandidates();
 
-  const [output, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
+  for (const [i, model] of models.entries()) {
+    const proc = Bun.spawn(
+      [
+        "omp",
+        "-p",
+        "--no-tools",
+        "--no-skills",
+        "--no-rules",
+        "--no-extensions",
+        "--no-session",
+        "--no-title",
+        "--system-prompt",
+        COMMIT_SYSTEM_PROMPT,
+        "--model",
+        model,
+        "--",
+        diffText,
+      ],
+      { stdout: "pipe", stderr: "pipe" },
+    );
 
-  if (exitCode !== 0) {
-    throw new StepError(`OMP failed (exit code ${exitCode})`, stderr.trim() || undefined);
+    const [output, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+
+    if (exitCode !== 0) {
+      const isNotFound = /model .* not found/i.test(stderr);
+      const nextModel = models[i + 1];
+      if (isNotFound && nextModel !== undefined) {
+        onFallback?.(model, nextModel);
+        continue;
+      }
+
+      throw new StepError(`OMP failed (exit code ${exitCode})`, stderr.trim() || undefined);
+    }
+
+    const content = stripFences(output);
+    if (!content) {
+      throw new StepError("OMP returned an empty response");
+    }
+    return content;
   }
 
-  const content = stripFences(output);
-  if (!content) {
-    throw new StepError("OMP returned an empty response");
-  }
-  return content;
+  throw new StepError("No available models found");
 }
