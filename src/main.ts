@@ -84,10 +84,9 @@ async function runCommit(verify: boolean, edit: boolean): Promise<void> {
     if (edit) {
       p.log.info("Opening editor...");
       await executeCommit(message, true);
-      p.outro(pc.green("Committed."));
+      p.log.step(pc.green("Committed"));
     } else {
-      await runStep(s, "Committing...", "Committed", () => executeCommit(message, false));
-      p.outro(pc.green("Committed."));
+      await runStep(s, "Committing...", pc.green("Committed"), () => executeCommit(message, false));
     }
   } catch (err) {
     if (err instanceof StepError) {
