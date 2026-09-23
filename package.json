@@ -12,7 +12,9 @@
     "lint:write": "oxlint --fix && oxfmt",
     "typecheck": "tsc --noEmit",
     "check": "oxlint --fix && oxfmt && tsc --noEmit",
-    "package": "bun build --compile --minify bin/lgnh-cli.ts --outfile dist/lgnh"
+    "package": "bun build --compile --minify bin/lgnh-cli.ts --outfile dist/lgnh",
+    "setup": "bun scripts/setup.ts",
+    "deploy": "bun run package && bun scripts/deploy.ts"
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",
