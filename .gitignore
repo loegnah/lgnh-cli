@@ -10,3 +10,4 @@ node_modules/
 
 # Bun / Build output
 *.log
+dist/

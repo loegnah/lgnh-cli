@@ -10,7 +10,8 @@
     "lint": "oxlint && oxfmt --check",
     "lint:write": "oxlint --fix && oxfmt",
     "typecheck": "tsc --noEmit",
-    "check": "oxlint --fix && oxfmt && tsc --noEmit"
+    "check": "oxlint --fix && oxfmt && tsc --noEmit",
+    "package": "bun build --compile --minify bin/lgnh-cli.ts --outfile dist/lgnh"
   },
   "devDependencies": {
     "@types/bun": "latest",
