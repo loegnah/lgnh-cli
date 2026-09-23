@@ -18,7 +18,7 @@ async function runStep<T>(
     s.stop(typeof stopText === "function" ? stopText(res) : stopText);
     return res;
   } catch (err) {
-    s.error(pc.red("작업 실패"));
+    s.error(pc.red("Failed"));
     throw err;
   }
 }
@@ -31,29 +31,29 @@ async function runCommit(verify: boolean, edit: boolean): Promise<void> {
     if (verify) {
       await runStep(
         s,
-        "프로젝트 검증 중...",
+        "Verifying...",
         (targets) =>
           targets.length > 0
-            ? `프로젝트 검증 완료 (${pc.dim(targets.join(", "))})`
-            : "프로젝트 검증 건너뜀 (검증 스크립트 없음)",
+            ? `Verified (${pc.dim(targets.join(", "))})`
+            : "No verification scripts",
         runProjectVerification,
       );
     }
 
     const staged = await runStep(
       s,
-      "변경사항 확인 중...",
-      (val) => (val ? "변경사항 확인 및 스테이징 완료" : "커밋할 변경사항 없음"),
+      "Checking changes...",
+      (val) => (val ? "Staged changes" : "No changes to commit"),
       getStagedDiff,
     );
 
     if (!staged) {
-      p.outro(pc.dim("워킹 트리가 깨끗합니다."));
+      p.outro(pc.dim("Working tree clean."));
       return;
     }
     const metrics = analyzeContext(staged.stat, staged.diff);
     p.log.info(
-      pc.bold("컨텍스트 토큰 요약:\n") +
+      pc.bold("Context tokens:\n") +
         pc.dim("  ├─ diff:   ") +
         pc.yellow(`${metrics.diff.tokens.toLocaleString()} tokens`) +
         pc.dim(` (${metrics.diff.chars.toLocaleString()} chars)\n`) +
@@ -70,22 +70,20 @@ async function runCommit(verify: boolean, edit: boolean): Promise<void> {
     const model = getModel();
     const message = await runStep(
       s,
-      `AI 커밋 메시지 생성 중... (${pc.cyan(model)})`,
-      "AI 커밋 메시지 생성 완료",
+      `Generating message... (${pc.cyan(model)})`,
+      "Generated message",
       () => generateCommitMessage(`${staged.stat}\n\n${staged.diff}`),
     );
 
-    p.note(message, "커밋 메시지");
+    p.note(message, "Commit message");
 
     if (edit) {
-      p.log.info("커밋 메시지 편집을 위해 에디터를 엽니다...");
+      p.log.info("Opening editor...");
       await executeCommit(message, true);
-      p.outro(pc.green("커밋이 완료되었습니다."));
+      p.outro(pc.green("Committed."));
     } else {
-      await runStep(s, "Git 커밋 생성 중...", "Git 커밋 생성 완료", () =>
-        executeCommit(message, false),
-      );
-      p.outro(pc.green("커밋이 완료되었습니다."));
+      await runStep(s, "Committing...", "Committed", () => executeCommit(message, false));
+      p.outro(pc.green("Committed."));
     }
   } catch (err) {
     if (err instanceof StepError) {

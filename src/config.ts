@@ -6,7 +6,7 @@ export interface LgnhConfig {
   model?: string;
 }
 
-export const DEFAULT_MODEL = "@tiny";
+export const DEFAULT_MODEL = "@commit";
 
 export function getConfigPath(): string {
   if (process.env.LGNH_CONFIG_PATH) return process.env.LGNH_CONFIG_PATH;

@@ -32,7 +32,7 @@ export async function runProjectVerification(): Promise<string[]> {
         .filter(Boolean)
         .join("\n")
         .trim();
-      throw new StepError(`프로젝트 검증 실패: bun run ${t}`, detail);
+      throw new StepError(`Verification failed: bun run ${t}`, detail);
     }
   }
   return targets;
@@ -75,7 +75,7 @@ export async function getStagedDiff(): Promise<{ diff: string; stat: string } | 
     proc.exited,
   ]);
   if (exitCode !== 0) {
-    throw new StepError("변경사항 diff 조회 실패", stderr.trim() || undefined);
+    throw new StepError("Failed to get staged diff", stderr.trim() || undefined);
   }
   let diff = stripDiffMetadata(stdout);
   if (diff.length > MAX_DIFF_CHARS)
@@ -90,7 +90,7 @@ export async function executeCommit(message: string, edit?: boolean): Promise<vo
     const proc = Bun.spawn(["git", ...args], { stdio: ["inherit", "inherit", "inherit"] });
     const code = await proc.exited;
     if (code !== 0) {
-      throw new StepError(`Git 커밋 실패 (종료 코드: ${code})`);
+      throw new StepError(`Git commit failed (exit code ${code})`);
     }
     return;
   }
@@ -103,6 +103,6 @@ export async function executeCommit(message: string, edit?: boolean): Promise<vo
   ]);
   if (code !== 0) {
     const detail = (stderr || stdout).trim();
-    throw new StepError("Git 커밋 생성 실패", detail);
+    throw new StepError("Git commit failed", detail);
   }
 }

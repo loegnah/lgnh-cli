@@ -20,7 +20,7 @@ ln -s $(pwd)/bin/lgnh-cli.ts /usr/local/bin/lgnh
 # Config & model
 lgnh config          # view config path and current model
 lgnh model           # view current model
-lgnh model <id>      # change model (default: @tiny)
+lgnh model <id>      # change model (default: @commit)
 # Run in any git repository
 lgnh commit         # verify project (lint/typecheck), generate message, commit
 lgnh commit-fast    # skip verification, generate message, commit

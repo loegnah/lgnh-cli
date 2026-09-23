@@ -74,15 +74,12 @@ export async function generateCommitMessage(diffText: string): Promise<string> {
   ]);
 
   if (exitCode !== 0) {
-    throw new StepError(
-      `AI 커밋 메시지 생성 실패 (OMP 종료 코드: ${exitCode})`,
-      stderr.trim() || undefined,
-    );
+    throw new StepError(`OMP failed (exit code ${exitCode})`, stderr.trim() || undefined);
   }
 
   const content = stripFences(output);
   if (!content) {
-    throw new StepError("AI 커밋 메시지 생성 실패: OMP에서 빈 응답을 반환했습니다.");
+    throw new StepError("OMP returned an empty response");
   }
   return content;
 }
