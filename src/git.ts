@@ -25,6 +25,17 @@ export async function runProjectVerification(): Promise<void> {
   }
 }
 
+function stripDiffMetadata(raw: string): string {
+  return raw
+    .split("\n")
+    .filter(
+      (line) =>
+        !/^(?:index [0-9a-f]|(?:new|deleted|old) (?:file )?mode|similarity index)/.test(line),
+    )
+    .join("\n")
+    .trim();
+}
+
 export async function getStagedDiff(): Promise<{ diff: string; stat: string } | null> {
   await $`git add -A`.nothrow().quiet();
   const status = (await $`git status -s`.text()).trim();
@@ -34,6 +45,9 @@ export async function getStagedDiff(): Promise<{ diff: string; stat: string } | 
       "git",
       "diff",
       "--cached",
+      "-U1",
+      "--ignore-all-space",
+      "--ignore-blank-lines",
       "--",
       ".",
       ":(exclude)*lock*",
@@ -42,7 +56,7 @@ export async function getStagedDiff(): Promise<{ diff: string; stat: string } | 
     ],
     { stdout: "pipe" },
   );
-  let diff = await new Response(proc.stdout).text();
+  let diff = stripDiffMetadata(await new Response(proc.stdout).text());
   if (diff.length > MAX_DIFF_CHARS)
     diff = diff.slice(0, MAX_DIFF_CHARS) + "\n[diff truncated for length]";
   const stat = await $`git diff --cached --stat`.text();
