@@ -1,37 +1,44 @@
 import * as p from "@clack/prompts";
-import type { SpinnerResult } from "@clack/prompts";
 import pc from "picocolors";
 
 import { DEFAULT_MODEL, getConfigPath, getModel, loadConfig, saveConfig } from "./config.ts";
 import { executeCommit, getStagedDiff, runProjectVerification, StepError } from "./git.ts";
 import { analyzeContext, generateCommitMessage } from "./omp.ts";
 
+function formatElapsed(start: number): string {
+  const sec = Math.floor((performance.now() - start) / 1000);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `[${m}m ${s}s]` : `[${s}s]`;
+}
+
 async function runStep<T>(
-  s: SpinnerResult,
-  startText: string,
   stopText: string | ((val: T) => string),
   fn: () => Promise<T>,
+  startText?: string,
 ): Promise<T> {
-  s.start(startText);
+  if (startText) {
+    p.log.info(startText);
+  }
+  const start = performance.now();
   try {
     const res = await fn();
-    s.stop(typeof stopText === "function" ? stopText(res) : stopText);
+    const elapsed = formatElapsed(start);
+    const text = typeof stopText === "function" ? stopText(res) : stopText;
+    p.log.step(`${text} ${pc.dim(elapsed)}`);
     return res;
   } catch (err) {
-    s.error(pc.red("Failed"));
+    p.log.error(pc.red("Failed"));
     throw err;
   }
 }
 
 async function runCommit(verify: boolean, edit: boolean): Promise<void> {
   p.intro(verify ? pc.bold("lgnh commit") : pc.bold("lgnh commit-fast"));
-  const s = p.spinner();
 
   try {
     if (verify) {
       await runStep(
-        s,
-        "Verifying...",
         (targets) =>
           targets.length > 0
             ? `Verified (${pc.dim(targets.join(", "))})`
@@ -41,8 +48,6 @@ async function runCommit(verify: boolean, edit: boolean): Promise<void> {
     }
 
     const staged = await runStep(
-      s,
-      "Checking changes...",
       (val) => (val ? "Staged changes" : "No changes to commit"),
       getStagedDiff,
     );
@@ -68,15 +73,14 @@ async function runCommit(verify: boolean, edit: boolean): Promise<void> {
     );
 
     const initialModel = getModel();
-    const { message, resolvedModel } = await runStep(
-      s,
-      `Generating message... (${pc.cyan(initialModel)})`,
+    const { message } = await runStep(
       ({ resolvedModel }) => `Generated message (${pc.cyan(resolvedModel)})`,
       () =>
         generateCommitMessage(`${staged.stat}\n\n${staged.diff}`, (fromModel, toModel) => {
-          s.stop(`${pc.dim(fromModel)} 모델 없음 → ${pc.cyan(toModel)} 사용`);
-          s.start(`Generating message... (${pc.cyan(toModel)})`);
+          p.log.warn(`${pc.dim(fromModel)} 모델 없음 → ${pc.cyan(toModel)} 사용`);
+          p.log.info(`Generating message... (${pc.cyan(toModel)})`);
         }),
+      `Generating message... (${pc.cyan(initialModel)})`,
     );
 
     p.note(message, "Commit message");
@@ -86,7 +90,7 @@ async function runCommit(verify: boolean, edit: boolean): Promise<void> {
       await executeCommit(message, true);
       p.log.step(pc.green("Committed"));
     } else {
-      await runStep(s, "Committing...", pc.green("Committed"), () => executeCommit(message, false));
+      await runStep(pc.green("Committed"), () => executeCommit(message, false));
     }
   } catch (err) {
     if (err instanceof StepError) {
