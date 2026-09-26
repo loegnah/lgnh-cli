@@ -106,3 +106,19 @@ export async function executeCommit(message: string, edit?: boolean): Promise<vo
     throw new StepError("Git commit failed", detail);
   }
 }
+
+export async function executePush(): Promise<string> {
+  const proc = Bun.spawn(["git", "push"], { stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (code !== 0) {
+    const detail = (stderr || stdout).trim();
+    throw new StepError("Git push failed", detail);
+  }
+  const upstream = (await $`git rev-parse --abbrev-ref @{u}`.nothrow().quiet().text()).trim();
+  if (upstream) return upstream;
+  return (await $`git rev-parse --abbrev-ref HEAD`.quiet().text()).trim();
+}

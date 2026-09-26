@@ -22,7 +22,9 @@ lgnh config          # view config path and current model
 lgnh model           # view current model
 lgnh model <id>      # change model (default: @commit)
 # Run in any git repository
-lgnh commit         # verify project (lint/typecheck), generate message, commit
-lgnh commit-fast    # skip verification, generate message, commit
-lgnh commit -e      # edit generated message before committing
+lgnh commit             # verify project (lint/typecheck), generate message, commit
+lgnh commit-fast        # skip verification, generate message, commit
+lgnh commit-push        # verify project, generate message, commit, and push
+lgnh commit-fast-push   # skip verification, commit, and push
+lgnh commit -e          # edit generated message before committing
 ```

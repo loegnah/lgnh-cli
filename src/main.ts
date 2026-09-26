@@ -2,7 +2,13 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 
 import { DEFAULT_MODEL, getConfigPath, getModel, loadConfig, saveConfig } from "./config.ts";
-import { executeCommit, getStagedDiff, runProjectVerification, StepError } from "./git.ts";
+import {
+  executeCommit,
+  executePush,
+  getStagedDiff,
+  runProjectVerification,
+  StepError,
+} from "./git.ts";
 import { analyzeContext, generateCommitMessage } from "./omp.ts";
 
 function formatElapsed(start: number): string {
@@ -33,8 +39,11 @@ async function runStep<T>(
   }
 }
 
-async function runCommit(verify: boolean, edit: boolean): Promise<void> {
-  p.intro(verify ? pc.bold("lgnh commit") : pc.bold("lgnh commit-fast"));
+async function runCommit(verify: boolean, edit: boolean, push = false): Promise<void> {
+  const cmdName =
+    "lgnh " +
+    (verify ? (push ? "commit-push" : "commit") : push ? "commit-fast-push" : "commit-fast");
+  p.intro(pc.bold(cmdName));
 
   try {
     if (verify) {
@@ -92,6 +101,17 @@ async function runCommit(verify: boolean, edit: boolean): Promise<void> {
     } else {
       await runStep(pc.green("Committed"), () => executeCommit(message, false));
     }
+
+    if (push) {
+      const target = await runStep(
+        (dest) => `Pushed to ${pc.cyan(dest)}`,
+        executePush,
+        "Pushing changes...",
+      );
+      p.outro(pc.green(`Committed & pushed to ${pc.cyan(target)}`));
+    } else {
+      p.outro(pc.green("Committed successfully."));
+    }
   } catch (err) {
     if (err instanceof StepError) {
       p.cancel(pc.red(err.message));
@@ -120,11 +140,13 @@ function showModel(): void {
 function help(): void {
   console.log(`lgnh — git diff based commit messages via OMP
 Usage:
-  lgnh commit [-e|--edit]        verify, generate message, commit
-  lgnh commit-fast [-e|--edit]   skip verification
-  lgnh config                    show config path, model
-  lgnh model                     show current model
-  lgnh model <id>                set model directly`);
+  lgnh commit [-e|--edit]             verify, generate message, commit
+  lgnh commit-fast [-e|--edit]        skip verification, commit
+  lgnh commit-push [-e|--edit]        verify, commit, and push
+  lgnh commit-fast-push [-e|--edit]   skip verification, commit, and push
+  lgnh config                         show config path, model
+  lgnh model                          show current model
+  lgnh model <id>                     set model directly`);
 }
 
 const args = process.argv.slice(2);
@@ -135,6 +157,10 @@ if (rest[0] === "commit") {
   await runCommit(true, edit);
 } else if (rest[0] === "commit-fast") {
   await runCommit(false, edit);
+} else if (rest[0] === "commit-push") {
+  await runCommit(true, edit, true);
+} else if (rest[0] === "commit-fast-push") {
+  await runCommit(false, edit, true);
 } else if (rest[0] === "config") {
   showConfig();
 } else if (rest[0] === "model" && rest[1]) {
