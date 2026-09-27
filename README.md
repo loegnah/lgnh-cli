@@ -21,6 +21,11 @@ ln -s $(pwd)/bin/lgnh-cli.ts /usr/local/bin/lgnh
 lgnh config          # view config path and current model
 lgnh model           # view current model
 lgnh model <id>      # change model (default: @commit)
+# Translation
+lgnh tr                 # interactive multi-line translation (KR ⇄ EN, finish with Ctrl+D)
+lgnh tr [text...]       # translate arguments directly
+echo "text" | lgnh tr   # pipe support for CLI workflows
+
 # Run in any git repository
 lgnh commit             # verify project (lint/typecheck), generate message, commit
 lgnh commit-fast        # skip verification, generate message, commit
