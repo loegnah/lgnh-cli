@@ -314,6 +314,24 @@ async function ttyInput(options: {
       }
     }
   };
+  const handleBackspace = () => {
+    if (!buffer) return;
+    const chars = [...buffer];
+    const lastChar = chars.pop() || "";
+    buffer = chars.join("");
+    if (lastChar === "\n") {
+      const prevLine = buffer.slice(buffer.lastIndexOf("\n") + 1);
+      let prevWidth = 0;
+      for (const ch of prevLine) {
+        prevWidth += charWidth(ch);
+      }
+      const cols = process.stdout.columns || 80;
+      const col = prevWidth > 0 && prevWidth % cols === 0 ? cols : (prevWidth % cols) + 1;
+      process.stdout.write(`\x1b[2K\x1b[A\x1b[${col}G`);
+      return;
+    }
+    process.stdout.write("\b \b".repeat(charWidth(lastChar)));
+  };
 
   if (state === "action") {
     actionPrompt();
@@ -335,6 +353,10 @@ async function ttyInput(options: {
 
         if (state === "input") {
           if (sequence === "\x1b[200~" || sequence === "\x1b[201~") continue;
+          if (sequence === "\x1b\x7f" || sequence === "\x1b\b") {
+            handleBackspace();
+            continue;
+          }
           if (sequence === "\x1b\r" || sequence === "\x1b\n") {
             await send();
             continue;
@@ -365,6 +387,10 @@ async function ttyInput(options: {
               buffer += "\n";
               process.stdout.write("\r\n");
             }
+            continue;
+          }
+          if (keyId === 127 || keyId === 8) {
+            handleBackspace();
             continue;
           }
         } else if (state === "action") {
@@ -458,14 +484,7 @@ async function ttyInput(options: {
       }
 
       if (key === "\u007f" || key === "\b") {
-        if (!buffer) continue;
-        const chars = [...buffer];
-        const lastChar = chars.pop() || "";
-        buffer = chars.join("");
-        if (lastChar === "\n") {
-          continue;
-        }
-        process.stdout.write("\b \b".repeat(charWidth(lastChar)));
+        handleBackspace();
         continue;
       }
       if (key === " " && (!buffer || buffer.endsWith("\n"))) {
