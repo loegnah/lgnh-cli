@@ -70,6 +70,10 @@ async function callOmp(
   input: string,
   onFallback?: (fromModel: string, toModel: string) => void,
 ): Promise<OmpResult> {
+  if (!Bun.which("omp")) {
+    throw new StepError("omp not found in PATH", "Install omp, then re-run lgnh.");
+  }
+
   const models = getModelCandidates();
 
   for (const [i, model] of models.entries()) {
