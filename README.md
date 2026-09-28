@@ -22,7 +22,8 @@ lgnh config          # view config path and current model
 lgnh model           # view current model
 lgnh model <id>      # change model (default: @commit)
 # Translation
-lgnh tr                 # interactive multi-line translation (KR ⇄ EN, finish with Ctrl+D)
+lgnh tr                 # multi-line input (Enter newline, Cmd+Enter translate, Ctrl+C exit)
+lgnh tr -i              # interactive loop: Cmd+Enter translate, [c] copy, [a] next, Ctrl+C exit
 lgnh tr [text...]       # translate arguments directly
 echo "text" | lgnh tr   # pipe support for CLI workflows
 
