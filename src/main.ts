@@ -289,11 +289,115 @@ async function ttyInput(options: {
   let state: "input" | "action" = options.initialState || "input";
   let last = options.initialLast || "";
   let buffer = "";
+  let cursor = 0;
   let escape = "";
+
+  const textWidth = (text: string) => {
+    let w = 0;
+    for (const ch of text) w += charWidth(ch);
+    return w;
+  };
+  const measure = (upto: number) => {
+    const width = process.stdout.columns || 80;
+    let rows = 0;
+    let col = 1;
+    buffer
+      .slice(0, upto)
+      .split("\n")
+      .forEach((line, i) => {
+        if (i > 0) rows += 1;
+        const w = textWidth(line);
+        rows += w > 0 ? Math.floor((w - 1) / width) : 0;
+        col = w > 0 ? (w % width === 0 ? width : (w % width) + 1) : 1;
+      });
+    return { rows, col };
+  };
+  const moveTo = (from: number, to: number) => {
+    const a = measure(from);
+    const b = measure(to);
+    const d = b.rows - a.rows;
+    if (d > 0) process.stdout.write(`\x1b[${d}B`);
+    else if (d < 0) process.stdout.write(`\x1b[${-d}A`);
+    process.stdout.write(`\r\x1b[${b.col}G`);
+  };
+  const repaint = (up: number) => {
+    if (up > 0) process.stdout.write(`\x1b[${up}A`);
+    process.stdout.write("\r\x1b[1G");
+    buffer.split("\n").forEach((line, i) => {
+      if (i > 0) process.stdout.write("\r\n");
+      process.stdout.write(line + "\x1b[K");
+    });
+    process.stdout.write("\x1b[J");
+    moveTo(buffer.length, cursor);
+  };
+  const prevIndex = (i: number) => {
+    const p = i - 1;
+    const code = buffer.charCodeAt(p);
+    return p > 0 && code >= 0xdc00 && code <= 0xdfff ? p - 1 : p;
+  };
+  const nextIndex = (i: number) => {
+    const code = buffer.charCodeAt(i);
+    return Math.min(code >= 0xd800 && code <= 0xdbff ? i + 2 : i + 1, buffer.length);
+  };
+  const setCursor = (next: number) => {
+    const to = Math.max(0, Math.min(next, buffer.length));
+    if (to === cursor) return;
+    const from = cursor;
+    cursor = to;
+    moveTo(from, cursor);
+  };
+  const insert = (text: string) => {
+    const from = cursor;
+    const up = measure(cursor).rows;
+    buffer = buffer.slice(0, cursor) + text + buffer.slice(cursor);
+    cursor += text.length;
+    if (from === buffer.length - text.length && !text.includes("\n")) {
+      process.stdout.write(text);
+      return;
+    }
+    repaint(up);
+  };
+  const deleteBefore = () => {
+    if (cursor === 0) return;
+    const up = measure(cursor).rows;
+    const p = prevIndex(cursor);
+    buffer = buffer.slice(0, p) + buffer.slice(cursor);
+    cursor = p;
+    repaint(up);
+  };
+  const seekColumn = (start: number, end: number, target: number) => {
+    let i = start;
+    let w = 0;
+    while (i < end) {
+      const nx = Math.min(nextIndex(i), end);
+      const cw = textWidth(buffer.slice(i, nx));
+      if (w + cw > target) break;
+      w += cw;
+      i = nx;
+    }
+    return i;
+  };
+  const moveLine = (dir: -1 | 1) => {
+    const start = buffer.lastIndexOf("\n", cursor - 1) + 1;
+    const nl = buffer.indexOf("\n", cursor);
+    const end = nl === -1 ? buffer.length : nl;
+    const target = textWidth(buffer.slice(start, cursor));
+    if (dir === -1) {
+      if (start === 0) return;
+      const prevEnd = start - 1;
+      setCursor(seekColumn(buffer.lastIndexOf("\n", prevEnd - 1) + 1, prevEnd, target));
+      return;
+    }
+    if (end === buffer.length) return;
+    const nextStart = end + 1;
+    const nextNl = buffer.indexOf("\n", nextStart);
+    setCursor(seekColumn(nextStart, nextNl === -1 ? buffer.length : nextNl, target));
+  };
 
   const send = async () => {
     const text = buffer;
     buffer = "";
+    cursor = 0;
     if (!text.trim()) {
       prompt();
       return;
@@ -314,25 +418,6 @@ async function ttyInput(options: {
       }
     }
   };
-  const handleBackspace = () => {
-    if (!buffer) return;
-    const chars = [...buffer];
-    const lastChar = chars.pop() || "";
-    buffer = chars.join("");
-    if (lastChar === "\n") {
-      const prevLine = buffer.slice(buffer.lastIndexOf("\n") + 1);
-      let prevWidth = 0;
-      for (const ch of prevLine) {
-        prevWidth += charWidth(ch);
-      }
-      const cols = process.stdout.columns || 80;
-      const col = prevWidth > 0 && prevWidth % cols === 0 ? cols : (prevWidth % cols) + 1;
-      process.stdout.write(`\x1b[2K\x1b[A\x1b[${col}G`);
-      return;
-    }
-    process.stdout.write("\b \b".repeat(charWidth(lastChar)));
-  };
-
   if (state === "action") {
     actionPrompt();
   } else {
@@ -354,7 +439,7 @@ async function ttyInput(options: {
         if (state === "input") {
           if (sequence === "\x1b[200~" || sequence === "\x1b[201~") continue;
           if (sequence === "\x1b\x7f" || sequence === "\x1b\b") {
-            handleBackspace();
+            deleteBefore();
             continue;
           }
           if (sequence === "\x1b\r" || sequence === "\x1b\n") {
@@ -362,8 +447,23 @@ async function ttyInput(options: {
             continue;
           }
           if (sequence === "\x1bOM") {
-            buffer += "\n";
-            process.stdout.write("\r\n");
+            insert("\n");
+            continue;
+          }
+          if (sequence === "\x1b[A") {
+            moveLine(-1);
+            continue;
+          }
+          if (sequence === "\x1b[B") {
+            moveLine(1);
+            continue;
+          }
+          if (sequence === "\x1b[C") {
+            setCursor(nextIndex(cursor));
+            continue;
+          }
+          if (sequence === "\x1b[D") {
+            setCursor(prevIndex(cursor));
             continue;
           }
 
@@ -381,16 +481,12 @@ async function ttyInput(options: {
           if (keyId === 13) {
             const hasCtrl = ((mod - 1) & 4) !== 0;
             const hasSuper = ((mod - 1) & 8) !== 0;
-            if (hasSuper || hasCtrl) {
-              await send();
-            } else {
-              buffer += "\n";
-              process.stdout.write("\r\n");
-            }
+            if (hasSuper || hasCtrl) await send();
+            else insert("\n");
             continue;
           }
           if (keyId === 127 || keyId === 8) {
-            handleBackspace();
+            deleteBefore();
             continue;
           }
         } else if (state === "action") {
@@ -417,6 +513,7 @@ async function ttyInput(options: {
           if (keyId === 97 || altKeyId === 97 || keyId === 0x3141 || keyId === 0x1106) {
             state = "input";
             buffer = "";
+            cursor = 0;
             process.stdout.write("\r\n");
             prompt();
             continue;
@@ -426,6 +523,8 @@ async function ttyInput(options: {
             continue;
           }
         }
+
+        if (sequence.length !== 2 || key === "[" || key === "O") continue;
       }
 
       if (key === "\x1b") {
@@ -433,7 +532,7 @@ async function ttyInput(options: {
         continue;
       }
 
-      if (key === "\u0003") {
+      if (key === "\u0003" || key === "\u0004") {
         quit();
         continue;
       }
@@ -466,6 +565,7 @@ async function ttyInput(options: {
         if (isNext) {
           state = "input";
           buffer = "";
+          cursor = 0;
           process.stdout.write("\r\n");
           prompt();
           continue;
@@ -478,21 +578,19 @@ async function ttyInput(options: {
       }
 
       if (key === "\r" || key === "\n") {
-        buffer += "\n";
-        process.stdout.write("\r\n");
+        insert("\n");
         continue;
       }
 
       if (key === "\u007f" || key === "\b") {
-        handleBackspace();
+        deleteBefore();
         continue;
       }
-      if (key === " " && (!buffer || buffer.endsWith("\n"))) {
+      if (key === " " && (cursor === 0 || buffer[cursor - 1] === "\n")) {
         continue;
       }
 
-      buffer += key;
-      process.stdout.write(key);
+      insert(key);
     }
   }
 
