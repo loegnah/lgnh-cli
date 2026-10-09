@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { $ } from "bun";
+import { runProcess } from "./process.ts";
 
 interface PackageJson {
   scripts?: Record<string, string>;
@@ -18,20 +18,21 @@ export class StepError extends Error {
   }
 }
 
-export async function runProjectVerification(): Promise<string[]> {
-  const root = (await $`git rev-parse --show-toplevel`.quiet().text()).trim();
-  const pkgPath = join(root, "package.json");
+export async function runProjectVerification(signal?: AbortSignal): Promise<string[]> {
+  const root = await runProcess(["git", "rev-parse", "--show-toplevel"], { signal });
+  if (root.exitCode !== 0) {
+    throw new StepError(root.stderr.trim() || "Failed to resolve the Git project root");
+  }
+  const projectRoot = root.stdout.trim();
+  const pkgPath = join(projectRoot, "package.json");
   if (!existsSync(pkgPath)) return [];
   const pkg: PackageJson = JSON.parse(readFileSync(pkgPath, "utf-8"));
   const scripts = pkg.scripts ?? {};
   const targets = scripts.check ? ["check"] : ["lint", "typecheck"].filter((s) => scripts[s]);
   for (const t of targets) {
-    const res = await $`bun run ${t}`.cwd(root).nothrow().quiet();
+    const res = await runProcess(["bun", "run", t], { cwd: projectRoot, signal });
     if (res.exitCode !== 0) {
-      const detail = [res.stdout.toString(), res.stderr.toString()]
-        .filter(Boolean)
-        .join("\n")
-        .trim();
+      const detail = [res.stdout, res.stderr].filter(Boolean).join("\n").trim();
       throw new StepError(`Verification failed: bun run ${t}`, detail);
     }
   }
@@ -49,11 +50,16 @@ function stripDiffMetadata(raw: string): string {
     .trim();
 }
 
-export async function getStagedDiff(): Promise<{ diff: string; stat: string } | null> {
-  await $`git add -A`.nothrow().quiet();
-  const status = (await $`git status -s`.quiet().text()).trim();
-  if (!status) return null;
-  const proc = Bun.spawn(
+export async function getStagedDiff(
+  signal?: AbortSignal,
+): Promise<{ diff: string; stat: string } | null> {
+  await runProcess(["git", "add", "-A"], { signal });
+  const statusRes = await runProcess(["git", "status", "-s"], { signal });
+  if (statusRes.exitCode !== 0) {
+    throw new StepError(statusRes.stderr.trim() || "git status failed");
+  }
+  if (!statusRes.stdout.trim()) return null;
+  const res = await runProcess(
     [
       "git",
       "diff",
@@ -67,58 +73,48 @@ export async function getStagedDiff(): Promise<{ diff: string; stat: string } | 
       ":(exclude)*.min.*",
       ":(exclude)*.map",
     ],
-    { stdout: "pipe", stderr: "pipe" },
+    { signal },
   );
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  if (exitCode !== 0) {
-    throw new StepError("Failed to get staged diff", stderr.trim() || undefined);
+  if (res.exitCode !== 0) {
+    throw new StepError("Failed to get staged diff", res.stderr.trim() || undefined);
   }
-  let diff = stripDiffMetadata(stdout);
+  let diff = stripDiffMetadata(res.stdout);
   if (diff.length > MAX_DIFF_CHARS)
     diff = diff.slice(0, MAX_DIFF_CHARS) + "\n[diff truncated for length]";
-  const stat = await $`git diff --cached --stat`.quiet().text();
+  const stat = (await runProcess(["git", "diff", "--cached", "--stat"], { signal })).stdout;
   return { diff, stat };
 }
 
-export async function executeCommit(message: string, edit?: boolean): Promise<void> {
+export async function executeCommit(
+  message: string,
+  edit?: boolean,
+  signal?: AbortSignal,
+): Promise<void> {
   const args = edit ? ["commit", "-e", "-m", message] : ["commit", "-m", message];
   if (edit) {
-    const proc = Bun.spawn(["git", ...args], { stdio: ["inherit", "inherit", "inherit"] });
-    const code = await proc.exited;
-    if (code !== 0) {
-      throw new StepError(`Git commit failed (exit code ${code})`);
+    const proc = await runProcess(["git", ...args], { inherit: true, signal });
+    if (proc.exitCode !== 0) {
+      throw new StepError(`Git commit failed (exit code ${proc.exitCode})`);
     }
     return;
   }
 
-  const proc = Bun.spawn(["git", ...args], { stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  if (code !== 0) {
-    const detail = (stderr || stdout).trim();
+  const proc = await runProcess(["git", ...args], { signal });
+  if (proc.exitCode !== 0) {
+    const detail = (proc.stderr || proc.stdout).trim();
     throw new StepError("Git commit failed", detail);
   }
 }
 
-export async function executePush(): Promise<string> {
-  const proc = Bun.spawn(["git", "push"], { stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  if (code !== 0) {
-    const detail = (stderr || stdout).trim();
+export async function executePush(signal?: AbortSignal): Promise<string> {
+  const proc = await runProcess(["git", "push"], { signal });
+  if (proc.exitCode !== 0) {
+    const detail = (proc.stderr || proc.stdout).trim();
     throw new StepError("Git push failed", detail);
   }
-  const upstream = (await $`git rev-parse --abbrev-ref @{u}`.nothrow().quiet().text()).trim();
+  const upstream = (
+    await runProcess(["git", "rev-parse", "--abbrev-ref", "@{u}"], { signal })
+  ).stdout.trim();
   if (upstream) return upstream;
-  return (await $`git rev-parse --abbrev-ref HEAD`.quiet().text()).trim();
+  return (await runProcess(["git", "rev-parse", "--abbrev-ref", "HEAD"], { signal })).stdout.trim();
 }

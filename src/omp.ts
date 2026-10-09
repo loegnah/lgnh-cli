@@ -3,6 +3,7 @@ import { countTokens } from "gpt-tokenizer";
 
 import { getModelCandidates } from "./config.ts";
 import { StepError } from "./git.ts";
+import { runProcess } from "./process.ts";
 
 const COMMIT_SYSTEM_PROMPT = `Generate a git commit message. English only.
 Format: <type>(<scope>): <subject> (under 72 chars)
@@ -72,6 +73,7 @@ async function callOmp(
   systemPrompt: string,
   input: string,
   onFallback?: (fromModel: string, toModel: string) => void,
+  signal?: AbortSignal,
 ): Promise<OmpResult> {
   if (!Bun.which("omp")) {
     throw new StepError("omp not found in PATH", "Install omp, then re-run lgnh.");
@@ -80,7 +82,11 @@ async function callOmp(
   const models = getModelCandidates();
 
   for (const [i, model] of models.entries()) {
-    const proc = Bun.spawn(
+    const {
+      stdout: output,
+      stderr,
+      exitCode,
+    } = await runProcess(
       [
         "omp",
         "-p",
@@ -101,14 +107,8 @@ async function callOmp(
         "--",
         input,
       ],
-      { stdout: "pipe", stderr: "pipe" },
+      { signal },
     );
-
-    const [output, stderr, exitCode] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
 
     if (exitCode !== 0) {
       const isNotFound = /model .* not found/i.test(stderr);
@@ -157,8 +157,9 @@ async function callOmp(
 export async function generateCommitMessage(
   diffText: string,
   onFallback?: (fromModel: string, toModel: string) => void,
+  signal?: AbortSignal,
 ): Promise<CommitMessageResult> {
-  const { text, resolvedModel } = await callOmp(COMMIT_SYSTEM_PROMPT, diffText, onFallback);
+  const { text, resolvedModel } = await callOmp(COMMIT_SYSTEM_PROMPT, diffText, onFallback, signal);
   const message = stripFences(text);
   if (!message) {
     throw new StepError("OMP returned an empty response");
@@ -169,6 +170,7 @@ export async function generateCommitMessage(
 export async function translateText(
   text: string,
   onFallback?: (fromModel: string, toModel: string) => void,
+  signal?: AbortSignal,
 ): Promise<OmpResult> {
-  return callOmp(TRANSLATE_SYSTEM_PROMPT, text, onFallback);
+  return callOmp(TRANSLATE_SYSTEM_PROMPT, text, onFallback, signal);
 }
