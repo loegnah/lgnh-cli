@@ -1,21 +1,10 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import type { TextareaRenderable, ClipboardService } from "@opentui/core";
+import type { TextareaRenderable } from "@opentui/core";
 import { translateText } from "../omp.ts";
 import { getModel } from "../config.ts";
-import { formatError } from "../workflows.ts";
-import type { TuiOutcome } from "./app.tsx";
-
-export interface TranslateScreenProps {
-  mode: "integrated" | "direct";
-  interactive: boolean;
-  initialText?: string;
-  clipboard?: ClipboardService;
-  onComplete: (outcome: TuiOutcome) => void;
-  onBackToHome: () => void;
-  setBusy: (busy: boolean) => void;
-  registerOperation: (controller: AbortController, promise: Promise<void>) => void;
-}
+import { formatError } from "../errors.ts";
+import type { TranslateScreenProps } from "./screens.ts";
 
 export interface TranslateEditorProps {
   focused?: boolean;

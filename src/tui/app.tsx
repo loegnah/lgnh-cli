@@ -6,7 +6,8 @@ import {
   createHostClipboard,
   createRendererClipboardAdapter,
 } from "@opentui/core";
-import { type CommitOptions, formatError } from "../workflows.ts";
+import { type CommitOptions } from "../workflows.ts";
+import { formatError } from "../errors.ts";
 import { getModel } from "../config.ts";
 import { TranslateScreen } from "./translate.tsx";
 import { CommitScreen } from "./commit.tsx";

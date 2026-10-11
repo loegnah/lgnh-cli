@@ -2,25 +2,14 @@ import { createSignal, onMount, Show, For } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import {
   runCommitWorkflow,
-  formatError,
   type CommitOptions,
   type CommitStep,
   type WorkflowEvent,
 } from "../workflows.ts";
+import { formatError } from "../errors.ts";
 import type { ContextTokenBreakdown } from "../omp.ts";
 import { getModel } from "../config.ts";
-import type { TuiOutcome } from "./app.tsx";
-
-export interface CommitScreenProps {
-  mode: "integrated" | "direct";
-  initialOptions?: CommitOptions;
-  onComplete: (outcome: TuiOutcome) => void;
-  onBackToHome: () => void;
-  setBusy: (busy: boolean) => void;
-  registerOperation: (controller: AbortController, promise: Promise<void>) => void;
-  suspendRenderer: () => void;
-  resumeRenderer: () => void;
-}
+import type { CommitScreenProps } from "./screens.ts";
 
 interface StepInfo {
   step: CommitStep;
