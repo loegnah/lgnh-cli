@@ -35,18 +35,18 @@ export interface ContextTokenBreakdown {
 }
 
 export function analyzeContext(stat: string, diff: string): ContextTokenBreakdown {
-  const promptTokens = countTokens(COMMIT_SYSTEM_PROMPT);
-  const statTokens = countTokens(stat);
-  const diffTokens = countTokens(diff);
+  const promptTokens = Math.round(countTokens(COMMIT_SYSTEM_PROMPT));
+  const statTokens = Math.round(countTokens(stat));
+  const diffTokens = Math.round(countTokens(diff));
 
   const fullPrompt = `${COMMIT_SYSTEM_PROMPT}\n\n${stat}\n\n${diff}`;
-  const totalTokens = countTokens(fullPrompt);
+  const totalTokens = Math.round(countTokens(fullPrompt));
 
   return {
-    prompt: { tokens: promptTokens, chars: COMMIT_SYSTEM_PROMPT.length },
-    stat: { tokens: statTokens, chars: stat.length },
-    diff: { tokens: diffTokens, chars: diff.length },
-    total: { tokens: totalTokens, chars: fullPrompt.length },
+    prompt: { tokens: promptTokens, chars: Math.round(COMMIT_SYSTEM_PROMPT.length) },
+    stat: { tokens: statTokens, chars: Math.round(stat.length) },
+    diff: { tokens: diffTokens, chars: Math.round(diff.length) },
+    total: { tokens: totalTokens, chars: Math.round(fullPrompt.length) },
   };
 }
 

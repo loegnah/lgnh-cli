@@ -252,7 +252,7 @@ export function CommitScreen(props: CommitScreenProps) {
                   <text fg={color()}>{icon()} </text>
                   <text fg={s.status === "pending" ? "#888888" : "white"}>{s.label}</text>
                   <Show when={s.elapsedMs !== undefined}>
-                    <text fg="#666666"> ({s.elapsedMs}ms)</text>
+                    <text fg="#666666"> ({Math.round(s.elapsedMs ?? 0)}ms)</text>
                   </Show>
                   <Show when={s.message}>
                     <text fg="#888888"> — {s.message}</text>
@@ -275,13 +275,16 @@ export function CommitScreen(props: CommitScreenProps) {
           marginBottom={1}
         >
           <text fg="#888888">
-            Prompt: {tokenBreakdown()?.prompt.tokens} tokens ({tokenBreakdown()?.prompt.chars}{" "}
-            chars) | Stat: {tokenBreakdown()?.stat.tokens} tokens ({tokenBreakdown()?.stat.chars}{" "}
-            chars)
+            Prompt: {Math.round(tokenBreakdown()?.prompt.tokens ?? 0)} tokens (
+            {Math.round(tokenBreakdown()?.prompt.chars ?? 0)} chars) | Stat:{" "}
+            {Math.round(tokenBreakdown()?.stat.tokens ?? 0)} tokens (
+            {Math.round(tokenBreakdown()?.stat.chars ?? 0)} chars)
           </text>
           <text fg="#888888">
-            Diff: {tokenBreakdown()?.diff.tokens} tokens ({tokenBreakdown()?.diff.chars} chars) |
-            Total: {tokenBreakdown()?.total.tokens} tokens ({tokenBreakdown()?.total.chars} chars)
+            Diff: {Math.round(tokenBreakdown()?.diff.tokens ?? 0)} tokens (
+            {Math.round(tokenBreakdown()?.diff.chars ?? 0)} chars) | Total:{" "}
+            {Math.round(tokenBreakdown()?.total.tokens ?? 0)} tokens (
+            {Math.round(tokenBreakdown()?.total.chars ?? 0)} chars)
           </text>
         </box>
       </Show>

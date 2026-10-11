@@ -205,6 +205,9 @@ export async function runTui(options: TuiOptions): Promise<TuiOutcome> {
     }
     try {
       process.stdin.pause();
+      // OpenTUI leaves stdin in raw mode with a referenced uv_tty_t handle; without
+      // unref the event loop never drains and the process hangs after runTui resolves.
+      process.stdin.unref?.();
     } catch {
       // Ignored
     }
