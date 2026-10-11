@@ -101,7 +101,7 @@ export function TranslateScreen(props: TranslateScreenProps) {
         setLastSuccessfulResult(res);
 
         if (props.mode === "direct" && !props.interactive) {
-          props.onComplete({ exitCode: 0, stdout: res.text });
+          props.onComplete({ exitCode: 0, stdout: `${res.text}\n` });
           return;
         }
         setPhase("result");

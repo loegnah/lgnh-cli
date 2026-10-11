@@ -127,7 +127,7 @@ export function CommitScreen(props: CommitScreenProps) {
           if (props.mode === "direct") {
             props.onComplete({
               exitCode: 0,
-              stdout: "Nothing to commit, working tree clean.",
+              stdout: "Nothing to commit, working tree clean.\n",
             });
             return;
           }
@@ -138,7 +138,7 @@ export function CommitScreen(props: CommitScreenProps) {
           if (props.mode === "direct") {
             const stdout = `Committed (${result.resolvedModel}): ${result.message}${
               result.pushTarget ? `\nPushed to ${result.pushTarget}` : ""
-            }`;
+            }\n`;
             props.onComplete({ exitCode: 0, stdout });
             return;
           }

@@ -133,10 +133,7 @@ function HomeScreen(props: {
 }
 
 export async function runTui(options: TuiOptions): Promise<TuiOutcome> {
-  let closedResolve!: () => void;
-  const closedPromise = new Promise<void>((resolve) => {
-    closedResolve = resolve;
-  });
+  const { promise: closedPromise, resolve: closedResolve } = Promise.withResolvers<void>();
   const renderer = await createCliRenderer({
     exitOnCtrlC: false,
     exitSignals: [],
@@ -147,10 +144,7 @@ export async function runTui(options: TuiOptions): Promise<TuiOutcome> {
   const terminalClipboard = createRendererClipboardAdapter(renderer);
   const clipboard = createClipboard({ host: hostClipboard, terminal: terminalClipboard });
 
-  let resolveOutcome!: (outcome: TuiOutcome) => void;
-  const outcomePromise = new Promise<TuiOutcome>((resolve) => {
-    resolveOutcome = resolve;
-  });
+  const { promise: outcomePromise, resolve: resolveOutcome } = Promise.withResolvers<TuiOutcome>();
 
   let isShuttingDown = false;
   let activeAbortController: AbortController | null = null;
@@ -178,10 +172,42 @@ export async function runTui(options: TuiOptions): Promise<TuiOutcome> {
       // Ignored during cleanup
     }
 
+    const hasRawMode = typeof process.stdin.setRawMode === "function";
+    const originalSetRawMode = hasRawMode ? process.stdin.setRawMode.bind(process.stdin) : null;
+    if (hasRawMode) {
+      process.stdin.setRawMode = () => process.stdin;
+    }
+
     renderer.destroy();
     await closedPromise;
     removeProcessListeners();
 
+    if (process.stdout.isTTY) {
+      process.stdout.write("\x1b[?1004l");
+    }
+
+    if (process.stdin.isTTY) {
+      await Bun.sleep(15);
+      try {
+        while (process.stdin.read() !== null) {}
+      } catch {
+        // Ignored
+      }
+    }
+
+    if (originalSetRawMode) {
+      process.stdin.setRawMode = originalSetRawMode;
+      try {
+        originalSetRawMode(false);
+      } catch {
+        // Ignored
+      }
+    }
+    try {
+      process.stdin.pause();
+    } catch {
+      // Ignored
+    }
     resolveOutcome(outcome);
   }
 

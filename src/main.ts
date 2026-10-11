@@ -83,8 +83,12 @@ async function runTuiAndPrint(options: TuiOptions): Promise<void> {
   // Static import would pull the renderer/native core into every plain path (help, config, pipes).
   const { runTui } = await import("./tui/app.tsx");
   const outcome: TuiOutcome = await runTui(options);
-  if (outcome.stdout) process.stdout.write(outcome.stdout);
-  if (outcome.stderr) process.stderr.write(outcome.stderr);
+  if (outcome.stdout) {
+    process.stdout.write(outcome.stdout.endsWith("\n") ? outcome.stdout : `${outcome.stdout}\n`);
+  }
+  if (outcome.stderr) {
+    process.stderr.write(outcome.stderr.endsWith("\n") ? outcome.stderr : `${outcome.stderr}\n`);
+  }
   process.exitCode = outcome.exitCode;
 }
 
