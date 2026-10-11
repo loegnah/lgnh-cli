@@ -51,9 +51,7 @@ export const translateCommand: Command = {
     "  lgnh tr [text...]                   translate text (KR ⇄ EN, or multi-line paste)",
     "  lgnh tr -i                          interactive loop mode",
   ].join("\n"),
-  async run(args: string[], env: CommandEnv): Promise<void> {
-    const at = args.findIndex((a) => translateCommand.names.includes(a));
-    const inputArgs = at >= 0 ? [...args.slice(0, at), ...args.slice(at + 1)] : args;
-    await runTranslate(inputArgs, env);
+  async run({ args }, env): Promise<void> {
+    await runTranslate(args, env);
   },
 };

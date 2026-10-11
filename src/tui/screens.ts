@@ -1,6 +1,7 @@
 import type { ClipboardService } from "@opentui/core";
-import type { CommitOptions } from "../workflows.ts";
-import type { TuiOutcome } from "./app.tsx";
+import type { CommitOptions } from "../workflows/commit.ts";
+import type { TuiOutcome } from "./types.ts";
+import type { OperationScope } from "./operations.ts";
 
 export type ScreenMode = "integrated" | "direct";
 
@@ -8,8 +9,7 @@ export interface ScreenProps {
   mode: ScreenMode;
   onComplete: (outcome: TuiOutcome) => void;
   onBackToHome: () => void;
-  setBusy: (busy: boolean) => void;
-  registerOperation: (controller: AbortController, promise: Promise<void>) => void;
+  operations: OperationScope;
 }
 
 export interface CommitScreenProps extends ScreenProps {

@@ -1,7 +1,7 @@
 import { formatError } from "../errors.ts";
-import { runCommitWorkflow } from "../workflows.ts";
-import type { CommitOptions, WorkflowEvent } from "../workflows.ts";
-import type { Command, CommandEnv } from "./types.ts";
+import { runCommitWorkflow } from "../workflows/commit.ts";
+import type { CommitOptions, WorkflowEvent } from "../workflows/commit.ts";
+import type { Command } from "./types.ts";
 
 function formatElapsed(ms: number): string {
   const sec = Math.floor(ms / 1000);
@@ -65,26 +65,32 @@ async function runCommitPlain(name: string, options: CommitOptions): Promise<voi
   }
 }
 
+// Each alias maps to its exact workflow options — the dispatcher guarantees `name` is one of the keys.
+const COMMIT_MODES: Record<string, Pick<CommitOptions, "verify" | "push">> = {
+  commit: { verify: true, push: false },
+  "commit-fast": { verify: false, push: false },
+  "commit-push": { verify: true, push: true },
+  "commit-fast-push": { verify: false, push: true },
+};
+
 export const commitCommand: Command = {
-  names: ["commit", "commit-fast", "commit-push", "commit-fast-push"],
+  names: Object.keys(COMMIT_MODES),
   help: [
     "  lgnh commit [-e|--edit]             verify, generate message, commit",
     "  lgnh commit-fast [-e|--edit]        skip verification, commit",
     "  lgnh commit-push [-e|--edit]        verify, commit, and push",
     "  lgnh commit-fast-push [-e|--edit]   skip verification, commit, and push",
   ].join("\n"),
-  async run(args: string[], env: CommandEnv): Promise<void> {
-    const commandName = args.find((a) => commitCommand.names.includes(a)) ?? "commit";
-    const edit = args.includes("-e") || args.includes("--edit");
+  async run({ name, args }, env): Promise<void> {
+    const mode = COMMIT_MODES[name]!;
     const options: CommitOptions = {
-      verify: !commandName.includes("fast"),
-      edit,
-      push: commandName.includes("push"),
+      ...mode,
+      edit: args.includes("-e") || args.includes("--edit"),
     };
     if (env.tuiEligible) {
       await env.runTui({ screen: "commit", options });
     } else {
-      await runCommitPlain(commandName, options);
+      await runCommitPlain(name, options);
     }
   },
 };

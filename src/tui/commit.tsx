@@ -5,7 +5,7 @@ import {
   type CommitOptions,
   type CommitStep,
   type WorkflowEvent,
-} from "../workflows.ts";
+} from "../workflows/commit.ts";
 import { formatError } from "../errors.ts";
 import type { ContextTokenBreakdown } from "../omp.ts";
 import { getModel } from "../config.ts";
@@ -44,7 +44,7 @@ export function CommitScreen(props: CommitScreenProps) {
   const [stepList, setStepList] = createSignal<StepInfo[]>([]);
 
   async function startWorkflow() {
-    if (isRunning()) return;
+    if (isRunning() || props.operations.busy) return;
 
     const currentOptions: CommitOptions = {
       verify: verify(),
@@ -65,12 +65,9 @@ export function CommitScreen(props: CommitScreenProps) {
     setStepList(initialSteps);
 
     setIsRunning(true);
-    props.setBusy(true);
     setErrorMessage(null);
     setIsDone(false);
     setCleanTree(false);
-
-    const controller = new AbortController();
 
     const handleEvent = (event: WorkflowEvent) => {
       if (event.type === "step") {
@@ -96,59 +93,59 @@ export function CommitScreen(props: CommitScreenProps) {
       }
     };
 
-    const workflowPromise = (async () => {
-      try {
-        const result = await runCommitWorkflow(currentOptions, {
-          signal: controller.signal,
-          onEvent: handleEvent,
-          beforeGit: async () => {
-            props.suspendRenderer();
-          },
-          afterGit: async () => {
-            props.resumeRenderer();
-          },
-        });
+    try {
+      await props.operations.run(async (signal) => {
+        try {
+          const result = await runCommitWorkflow(currentOptions, {
+            signal,
+            onEvent: handleEvent,
+            beforeGit: async () => {
+              props.suspendRenderer();
+            },
+            afterGit: async () => {
+              props.resumeRenderer();
+            },
+          });
 
-        setIsDone(true);
+          setIsDone(true);
 
-        if (!result.changed) {
-          setCleanTree(true);
-          if (props.mode === "direct") {
-            props.onComplete({
-              exitCode: 0,
-              stdout: "Nothing to commit, working tree clean.\n",
-            });
-            return;
+          if (!result.changed) {
+            setCleanTree(true);
+            if (props.mode === "direct") {
+              props.onComplete({
+                exitCode: 0,
+                stdout: "Nothing to commit, working tree clean.\n",
+              });
+              return;
+            }
+          } else {
+            if (result.pushTarget) {
+              setPushTarget(result.pushTarget);
+            }
+            if (props.mode === "direct") {
+              const stdout = `Committed (${result.resolvedModel}): ${result.message}${
+                result.pushTarget ? `\nPushed to ${result.pushTarget}` : ""
+              }\n`;
+              props.onComplete({ exitCode: 0, stdout });
+              return;
+            }
           }
-        } else {
-          if (result.pushTarget) {
-            setPushTarget(result.pushTarget);
-          }
+        } catch (err: unknown) {
+          if (signal.aborted) return;
+          const formatted = formatError(err);
+          setErrorMessage(formatted);
+
           if (props.mode === "direct") {
-            const stdout = `Committed (${result.resolvedModel}): ${result.message}${
-              result.pushTarget ? `\nPushed to ${result.pushTarget}` : ""
-            }\n`;
-            props.onComplete({ exitCode: 0, stdout });
+            props.onComplete({ exitCode: 1, stderr: formatted });
             return;
           }
         }
-      } catch (err: unknown) {
-        if (controller.signal.aborted) return;
-        const formatted = formatError(err);
-        setErrorMessage(formatted);
-
-        if (props.mode === "direct") {
-          props.onComplete({ exitCode: 1, stderr: formatted });
-          return;
-        }
-      } finally {
-        setIsRunning(false);
-        props.setBusy(false);
-      }
-    })();
-
-    props.registerOperation(controller, workflowPromise);
-    await workflowPromise;
+      });
+    } catch {
+      // Ignored during cancellation or external abort
+    } finally {
+      setIsRunning(false);
+    }
   }
 
   onMount(() => {
@@ -158,7 +155,7 @@ export function CommitScreen(props: CommitScreenProps) {
   });
 
   useKeyboard((e) => {
-    if (isRunning()) return;
+    if (isRunning() || props.operations.busy) return;
 
     if (e.name === "escape" || e.name === "q") {
       if (props.mode === "integrated") {
