@@ -2,7 +2,7 @@ import { devNull } from "node:os";
 import { countTokens } from "gpt-tokenizer";
 
 import { getModelCandidates } from "./config.ts";
-import { StepError } from "./git.ts";
+import { StepError } from "./errors.ts";
 import { runProcess } from "./process.ts";
 
 const COMMIT_SYSTEM_PROMPT = `Generate a git commit message. English only.
@@ -34,16 +34,20 @@ export interface ContextTokenBreakdown {
   total: ContextItemMetrics;
 }
 
-export function analyzeContext(stat: string, diff: string): ContextTokenBreakdown {
-  const promptTokens = Math.round(countTokens(COMMIT_SYSTEM_PROMPT));
+export function analyzeContext(
+  stat: string,
+  diff: string,
+  systemPrompt: string = COMMIT_SYSTEM_PROMPT,
+): ContextTokenBreakdown {
+  const promptTokens = Math.round(countTokens(systemPrompt));
   const statTokens = Math.round(countTokens(stat));
   const diffTokens = Math.round(countTokens(diff));
 
-  const fullPrompt = `${COMMIT_SYSTEM_PROMPT}\n\n${stat}\n\n${diff}`;
+  const fullPrompt = `${systemPrompt}\n\n${stat}\n\n${diff}`;
   const totalTokens = Math.round(countTokens(fullPrompt));
 
   return {
-    prompt: { tokens: promptTokens, chars: Math.round(COMMIT_SYSTEM_PROMPT.length) },
+    prompt: { tokens: promptTokens, chars: Math.round(systemPrompt.length) },
     stat: { tokens: statTokens, chars: Math.round(stat.length) },
     diff: { tokens: diffTokens, chars: Math.round(diff.length) },
     total: { tokens: totalTokens, chars: Math.round(fullPrompt.length) },

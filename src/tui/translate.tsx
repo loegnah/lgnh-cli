@@ -1,21 +1,10 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import type { TextareaRenderable, ClipboardService } from "@opentui/core";
+import type { TextareaRenderable } from "@opentui/core";
 import { translateText } from "../omp.ts";
 import { getModel } from "../config.ts";
-import { formatError } from "../workflows.ts";
-import type { TuiOutcome } from "./app.tsx";
-
-export interface TranslateScreenProps {
-  mode: "integrated" | "direct";
-  interactive: boolean;
-  initialText?: string;
-  clipboard?: ClipboardService;
-  onComplete: (outcome: TuiOutcome) => void;
-  onBackToHome: () => void;
-  setBusy: (busy: boolean) => void;
-  registerOperation: (controller: AbortController, promise: Promise<void>) => void;
-}
+import { formatError } from "../errors.ts";
+import type { TranslateScreenProps } from "./screens.ts";
 
 export interface TranslateEditorProps {
   focused?: boolean;
@@ -76,52 +65,48 @@ export function TranslateScreen(props: TranslateScreenProps) {
   const [copyFeedback, setCopyFeedback] = createSignal<string | null>(null);
 
   async function executeTranslation(text: string) {
-    if (phase() !== "input") return;
+    if (phase() !== "input" || props.operations.busy) return;
     const trimmed = text.trim();
     if (!trimmed) return;
 
     setPhase("translating");
-    props.setBusy(true);
     setErrorMessage(null);
     setCopyFeedback(null);
     setFallbackNotice(null);
 
-    const controller = new AbortController();
+    try {
+      await props.operations.run(async (signal) => {
+        try {
+          const res = await translateText(
+            trimmed,
+            (fromModel, toModel) => {
+              setFallbackNotice({ from: fromModel, to: toModel });
+            },
+            signal,
+          );
+          setResult(res);
+          setLastSuccessfulResult(res);
 
-    const operation = (async () => {
-      try {
-        const res = await translateText(
-          trimmed,
-          (fromModel, toModel) => {
-            setFallbackNotice({ from: fromModel, to: toModel });
-          },
-          controller.signal,
-        );
-        setResult(res);
-        setLastSuccessfulResult(res);
+          if (props.mode === "direct" && !props.interactive) {
+            props.onComplete({ exitCode: 0, stdout: `${res.text}\n` });
+            return;
+          }
+          setPhase("result");
+        } catch (err: unknown) {
+          if (signal.aborted) return;
+          const formatted = formatError(err);
+          setErrorMessage(formatted);
 
-        if (props.mode === "direct" && !props.interactive) {
-          props.onComplete({ exitCode: 0, stdout: `${res.text}\n` });
-          return;
+          if (props.mode === "direct" && !props.interactive) {
+            props.onComplete({ exitCode: 1, stderr: formatted });
+            return;
+          }
+          setPhase("result");
         }
-        setPhase("result");
-      } catch (err: unknown) {
-        if (controller.signal.aborted) return;
-        const formatted = formatError(err);
-        setErrorMessage(formatted);
-
-        if (props.mode === "direct" && !props.interactive) {
-          props.onComplete({ exitCode: 1, stderr: formatted });
-          return;
-        }
-        setPhase("result");
-      } finally {
-        props.setBusy(false);
-      }
-    })();
-
-    props.registerOperation(controller, operation);
-    await operation;
+      });
+    } catch {
+      // Ignored if cancelled
+    }
   }
 
   onMount(() => {

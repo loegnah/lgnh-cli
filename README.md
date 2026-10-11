@@ -63,3 +63,11 @@ bun run deploy          # build and copy to the configured directory
 ```
 
 OpenTUI's native library and assets are embedded in the standalone executable. No Zig toolchain is needed.
+
+## Extending the toolkit
+
+- `src/main.ts` only bootstraps the process. `src/cli.ts` resolves one command invocation and chooses plain output or the lazily loaded TUI.
+- Define CLI commands in `src/commands/` and register them in `src/commands/registry.ts`. Handlers receive `{ name, args }`; the dispatcher removes only the matched command token. Command aliases and help stay with their definitions.
+- Add terminal screens to `src/tui/registry.tsx`. Screen keys, home menu entries, numeric shortcuts and the exit number are derived from this registry. Add a `TuiOptions` variant in `src/tui/types.ts` only when the screen also needs a direct CLI entry.
+- `src/tui/app.tsx` owns navigation; `src/tui/runtime.tsx` owns renderer, clipboard, signals and terminal restoration. Screens use the shared `OperationScope.run(signal => ...)` for exclusive work; shutdown aborts and awaits the active operation before disposing the terminal.
+- Put UI-independent execution in `src/workflows/`. Commit orchestration lives in `commit.ts`; project script discovery and verification live in `verification.ts`. CLI handlers and terminal screens call the same workflow instead of implementing it twice.

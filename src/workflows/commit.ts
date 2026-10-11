@@ -1,13 +1,9 @@
-import { getModel } from "./config.ts";
-import {
-  executeCommit,
-  executePush,
-  getStagedDiff,
-  runProjectVerification,
-  StepError,
-} from "./git.ts";
-import { analyzeContext, generateCommitMessage } from "./omp.ts";
-import type { ContextTokenBreakdown } from "./omp.ts";
+import { getModel } from "../config.ts";
+import { formatError } from "../errors.ts";
+import { executeCommit, executePush, getStagedDiff } from "../git.ts";
+import { analyzeContext, generateCommitMessage } from "../omp.ts";
+import type { ContextTokenBreakdown } from "../omp.ts";
+import { runProjectVerification } from "./verification.ts";
 
 export interface CommitOptions {
   verify: boolean;
@@ -39,14 +35,6 @@ export interface WorkflowContext {
 export type CommitResult =
   | { changed: false }
   | { changed: true; message: string; resolvedModel: string; pushTarget?: string };
-
-export function formatError(error: unknown): string {
-  if (error instanceof StepError) {
-    return error.detail ? `${error.message}\n${error.detail}` : error.message;
-  }
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 export async function runCommitWorkflow(
   options: CommitOptions,
