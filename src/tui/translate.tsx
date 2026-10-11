@@ -198,7 +198,7 @@ export function TranslateScreen(props: TranslateScreenProps) {
   });
 
   return (
-    <box flexDirection="column" width="100%" height="100%" padding={1}>
+    <box flexDirection="column" width="100%" height="100%">
       {/* Header */}
       <box flexDirection="row" justifyContent="space-between" marginBottom={1}>
         <text fg="cyan">LGNH Translate</text>
@@ -216,14 +216,14 @@ export function TranslateScreen(props: TranslateScreenProps) {
 
       {/* Input Box */}
       <box
-        borderStyle="rounded"
+        border={["top"]}
+        borderStyle="single"
         borderColor={phase() === "input" ? "cyan" : "#444444"}
-        title="Input Text"
+        title=" Input Text "
         titleColor={phase() === "input" ? "cyan" : "#888888"}
         flexDirection="column"
         minHeight={5}
         flexGrow={phase() === "input" ? 1 : 0}
-        padding={1}
         marginBottom={1}
       >
         <TranslateEditor
@@ -246,11 +246,11 @@ export function TranslateScreen(props: TranslateScreenProps) {
       {/* Error display */}
       <Show when={errorMessage()}>
         <box
-          borderStyle="rounded"
+          border={["top"]}
+          borderStyle="single"
           borderColor="red"
-          title="Error"
+          title=" Error "
           titleColor="red"
-          padding={1}
           marginBottom={1}
         >
           <text fg="red">{errorMessage()}</text>
@@ -260,13 +260,13 @@ export function TranslateScreen(props: TranslateScreenProps) {
       {/* Result Display */}
       <Show when={phase() === "result" && (result() || lastSuccessfulResult())}>
         <box
-          borderStyle="rounded"
+          border={["top"]}
+          borderStyle="single"
           borderColor="green"
-          title={`Result (${(result() || lastSuccessfulResult())?.resolvedModel || "Translated"})`}
+          title={` Result (${(result() || lastSuccessfulResult())?.resolvedModel || "Translated"}) `}
           titleColor="green"
           flexDirection="column"
           flexGrow={1}
-          padding={1}
           marginBottom={1}
         >
           <scrollbox focused={phase() === "result"} flexGrow={1}>
@@ -281,7 +281,7 @@ export function TranslateScreen(props: TranslateScreenProps) {
       </Show>
 
       {/* Footer Shortcuts */}
-      <box marginTop="auto">
+      <box marginTop="auto" border={["top"]} borderStyle="single" borderColor="#333333">
         <Show
           when={phase() === "result"}
           fallback={
