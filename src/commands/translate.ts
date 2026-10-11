@@ -36,6 +36,14 @@ async function runTranslate(inputArgs: string[], env: CommandEnv): Promise<void>
     return;
   }
 
+  // Plain output leaves no editor to fall back on, and an interactive stdin has no EOF: reading it
+  // would block forever under output capture (OMP PTY). Ask for arguments or a pipe instead.
+  if (process.stdin.isTTY) {
+    console.error("No text to translate.");
+    process.exitCode = 1;
+    return;
+  }
+
   const piped = (await Bun.stdin.text()).trim();
   if (!piped) {
     console.error("No text to translate.");

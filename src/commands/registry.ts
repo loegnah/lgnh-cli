@@ -14,5 +14,8 @@ export const COMMANDS: readonly Command[] = [
 export function helpText(): string {
   return `lgnh — developer CLI toolkit via OMP
 Usage:
-${COMMANDS.map((command) => command.help).join("\n")}`;
+  lgnh [--plain | --tui] [command] [args...]
+${COMMANDS.map((command) => command.help).join("\n")}
+Output: a renderer opens only on a TTY outside output capture (OMP); the mode flags override that
+selection, but never open a renderer on non-TTY streams. Put them before the command.`;
 }
