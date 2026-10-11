@@ -76,7 +76,7 @@ export async function runCommitWorkflow(
         type: "step",
         step: name,
         status: "done",
-        elapsedMs: performance.now() - start,
+        elapsedMs: Math.round(performance.now() - start),
         ...(done ? { message: done } : {}),
       });
       return value;
@@ -85,7 +85,7 @@ export async function runCommitWorkflow(
         type: "step",
         step: name,
         status: "failed",
-        elapsedMs: performance.now() - start,
+        elapsedMs: Math.round(performance.now() - start),
         message: formatError(err),
       });
       throw err;

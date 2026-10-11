@@ -31,10 +31,10 @@ function printWorkflowEvent(event: WorkflowEvent): void {
       console.log(
         [
           "Context tokens:",
-          `  ├─ diff:   ${diff.tokens.toLocaleString()} tokens (${diff.chars.toLocaleString()} chars)`,
-          `  ├─ stat:   ${stat.tokens.toLocaleString()} tokens (${stat.chars.toLocaleString()} chars)`,
-          `  ├─ prompt: ${prompt.tokens.toLocaleString()} tokens (${prompt.chars.toLocaleString()} chars)`,
-          `  └─ total:  ${total.tokens.toLocaleString()} tokens`,
+          `  ├─ diff:   ${Math.round(diff.tokens).toLocaleString()} tokens (${Math.round(diff.chars).toLocaleString()} chars)`,
+          `  ├─ stat:   ${Math.round(stat.tokens).toLocaleString()} tokens (${Math.round(stat.chars).toLocaleString()} chars)`,
+          `  ├─ prompt: ${Math.round(prompt.tokens).toLocaleString()} tokens (${Math.round(prompt.chars).toLocaleString()} chars)`,
+          `  └─ total:  ${Math.round(total.tokens).toLocaleString()} tokens`,
         ].join("\n"),
       );
       return;
