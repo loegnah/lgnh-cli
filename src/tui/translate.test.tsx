@@ -73,3 +73,102 @@ test("TranslateEditor multiline paste, emoji boundary deletion, Enter newline, a
     setup.renderer.destroy();
   }
 });
+
+test("TranslateEditor recalls history with Up and returns to the draft with Down", async () => {
+  const setup = await testRender(
+    () => (
+      <TranslateEditor focused={true} history={["first", "second", "third"]} onSubmit={() => {}} />
+    ),
+    { width: 80, height: 24, kittyKeyboard: true },
+  );
+
+  try {
+    await setup.renderOnce();
+
+    // Up in an empty editor recalls the most recent entry.
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("third");
+
+    // Up again walks back to the previous entry.
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("second");
+
+    // Down moves forward toward newer entries.
+    setup.mockInput.pressArrow("down");
+    await setup.renderOnce();
+    let frame = setup.captureCharFrame();
+    expect(frame).toContain("third");
+    expect(frame).not.toContain("second");
+
+    // Down from the newest entry returns to the empty draft.
+    setup.mockInput.pressArrow("down");
+    await setup.renderOnce();
+    frame = setup.captureCharFrame();
+    expect(frame).not.toContain("third");
+    expect(frame).not.toContain("second");
+  } finally {
+    setup.renderer.destroy();
+  }
+});
+
+test("TranslateEditor leaves Up to the textarea once the user types", async () => {
+  const setup = await testRender(
+    () => <TranslateEditor focused={true} history={["recalled"]} onSubmit={() => {}} />,
+    { width: 80, height: 24, kittyKeyboard: true },
+  );
+
+  try {
+    await setup.renderOnce();
+    await setup.mockInput.typeText("typed");
+    await setup.renderOnce();
+
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+
+    const frame = setup.captureCharFrame();
+    expect(frame).toContain("typed");
+    expect(frame).not.toContain("recalled");
+  } finally {
+    setup.renderer.destroy();
+  }
+});
+
+test("TranslateEditor resets history navigation after submit", async () => {
+  let submitted = "";
+
+  const setup = await testRender(
+    () => (
+      <TranslateEditor
+        focused={true}
+        history={["older", "latest"]}
+        onSubmit={(text) => {
+          submitted = text;
+        }}
+      />
+    ),
+    { width: 80, height: 24, kittyKeyboard: true },
+  );
+
+  try {
+    await setup.renderOnce();
+
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("latest");
+
+    setup.mockInput.pressEnter({ ctrl: true });
+    await setup.renderOnce();
+    await setup.waitFor(() => submitted === "latest");
+
+    // Index was reset, so Up no longer walks back to the older entry.
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+    const frame = setup.captureCharFrame();
+    expect(frame).toContain("latest");
+    expect(frame).not.toContain("older");
+  } finally {
+    setup.renderer.destroy();
+  }
+});

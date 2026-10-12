@@ -22,4 +22,5 @@ export interface TranslateScreenProps extends ScreenProps {
   interactive: boolean;
   initialText?: string;
   clipboard?: ClipboardService;
+  history?: string[];
 }

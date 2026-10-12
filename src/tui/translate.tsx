@@ -1,6 +1,7 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import type { TextareaRenderable } from "@opentui/core";
+import { addTranslateHistory, loadTranslateHistory } from "../history.ts";
 import { translateText } from "../omp.ts";
 import { getModel } from "../config.ts";
 import { formatError } from "../errors.ts";
@@ -11,10 +12,20 @@ export interface TranslateEditorProps {
   initialValue?: string;
   onSubmit: (text: string) => void;
   onRef?: (el: TextareaRenderable) => void;
+  history?: string[];
 }
 
 export function TranslateEditor(props: TranslateEditorProps) {
   let textareaRef: TextareaRenderable | undefined;
+  let historyIndex = -1;
+  let draft = "";
+
+  const historyList = () => props.history ?? loadTranslateHistory();
+
+  function applyText(text: string) {
+    textareaRef?.setText(text);
+    textareaRef?.gotoBufferEnd();
+  }
 
   const textareaKeyBindings = [
     { name: "return", ctrl: true, action: "submit" as const },
@@ -30,8 +41,64 @@ export function TranslateEditor(props: TranslateEditorProps) {
   function handleSubmit() {
     const text = textareaRef?.plainText ?? "";
     if (!text.trim()) return;
+    historyIndex = -1;
+    draft = "";
     props.onSubmit(text);
   }
+
+  useKeyboard((e) => {
+    if (props.focused === false || e.ctrl || e.meta || e.super || e.shift) return;
+
+    if (e.name === "up") {
+      const list = historyList();
+      if (list.length === 0 || !textareaRef) return;
+      const currentText = textareaRef.plainText;
+
+      // Empty editor (or still at the draft): start from the most recent entry.
+      if (currentText.trim() === "") {
+        draft = currentText;
+        historyIndex = list.length - 1;
+        applyText(list[historyIndex]!);
+        e.preventDefault();
+        return;
+      }
+
+      // Unmodified recalled entry: step back through history.
+      if (historyIndex !== -1 && currentText === list[historyIndex]) {
+        if (historyIndex > 0) {
+          historyIndex--;
+          applyText(list[historyIndex]!);
+        }
+        e.preventDefault();
+        return;
+      }
+
+      // User edited the recalled entry: hand arrow keys back to the textarea.
+      historyIndex = -1;
+      return;
+    }
+
+    if (e.name === "down") {
+      if (historyIndex === -1 || !textareaRef) return;
+      const list = historyList();
+      const currentText = textareaRef.plainText;
+
+      if (currentText === list[historyIndex]) {
+        e.preventDefault();
+        if (historyIndex < list.length - 1) {
+          historyIndex++;
+          applyText(list[historyIndex]!);
+        } else {
+          historyIndex = -1;
+          applyText(draft);
+        }
+        return;
+      }
+
+      historyIndex = -1;
+      return;
+    }
+  });
 
   return (
     <textarea
@@ -63,11 +130,14 @@ export function TranslateScreen(props: TranslateScreenProps) {
   );
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
   const [copyFeedback, setCopyFeedback] = createSignal<string | null>(null);
+  const [history, setHistory] = createSignal<string[]>(props.history ?? loadTranslateHistory());
 
   async function executeTranslation(text: string) {
     if (phase() !== "input" || props.operations.busy) return;
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    setHistory(addTranslateHistory(trimmed));
 
     setPhase("translating");
     setErrorMessage(null);
@@ -229,6 +299,7 @@ export function TranslateScreen(props: TranslateScreenProps) {
         <TranslateEditor
           focused={phase() === "input"}
           initialValue={props.initialText || ""}
+          history={history()}
           onSubmit={executeTranslation}
           onRef={(el) => {
             textareaRef = el;

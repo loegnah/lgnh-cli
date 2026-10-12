@@ -1,4 +1,5 @@
 import { formatError } from "../errors.ts";
+import { addTranslateHistory } from "../history.ts";
 import { translateText } from "../omp.ts";
 import type { Command, CommandEnv } from "./types.ts";
 
@@ -32,6 +33,7 @@ async function runTranslate(inputArgs: string[], env: CommandEnv): Promise<void>
   }
 
   if (text) {
+    addTranslateHistory(text);
     await translatePlain(text, Boolean(process.stdout.isTTY));
     return;
   }
