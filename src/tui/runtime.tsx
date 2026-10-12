@@ -16,6 +16,7 @@ export async function runTui(options: TuiOptions): Promise<TuiOutcome> {
     exitOnCtrlC: false,
     exitSignals: [],
     onDestroy: closedResolve,
+    useMouse: false,
   });
 
   const hostClipboard = createHostClipboard();
@@ -50,7 +51,7 @@ export async function runTui(options: TuiOptions): Promise<TuiOutcome> {
     removeProcessListeners();
 
     if (process.stdout.isTTY) {
-      process.stdout.write("\x1b[?1004l");
+      process.stdout.write("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1004l\x1b[?1006l");
     }
 
     if (process.stdin.isTTY) {
@@ -112,7 +113,12 @@ export async function runTui(options: TuiOptions): Promise<TuiOutcome> {
           onShutdown={(outcome) => {
             void shutdown(outcome);
           }}
-          suspendRenderer={() => renderer.suspend()}
+          suspendRenderer={() => {
+            renderer.suspend();
+            if (process.stdout.isTTY) {
+              process.stdout.write("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1004l\x1b[?1006l");
+            }
+          }}
           resumeRenderer={() => renderer.resume()}
         />
       ),
