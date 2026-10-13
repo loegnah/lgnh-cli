@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { testRender } from "@opentui/solid";
 import { TranslateEditor } from "./translate.tsx";
 
-test("TranslateEditor multiline paste, emoji boundary deletion, Enter newline, and Ctrl+Enter submit", async () => {
+test("TranslateEditor multiline paste, emoji boundary deletion, Shift+Enter newline, and Enter submit", async () => {
   let submittedCount = 0;
   let submittedText = "";
 
@@ -44,8 +44,8 @@ test("TranslateEditor multiline paste, emoji boundary deletion, Enter newline, a
     // Ensure the preceding text remained intact and uncorrupted
     expect(frame).toContain("두 번째 줄");
 
-    // 3. Plain Enter adds a newline without submitting
-    setup.mockInput.pressEnter();
+    // 3. Shift+Enter adds a newline without submitting
+    setup.mockInput.pressEnter({ shift: true });
     await setup.renderOnce();
     expect(submittedCount).toBe(0);
 
@@ -56,8 +56,8 @@ test("TranslateEditor multiline paste, emoji boundary deletion, Enter newline, a
     expect(frame).toContain("caqㅊ");
     expect(submittedCount).toBe(0);
 
-    // 5. Ctrl+Enter submits exactly once with the exact edited Unicode payload
-    setup.mockInput.pressEnter({ ctrl: true });
+    // 5. Plain Enter submits exactly once with the exact edited Unicode payload
+    setup.mockInput.pressEnter();
     await setup.renderOnce();
 
     await setup.waitFor(() => submittedCount === 1);

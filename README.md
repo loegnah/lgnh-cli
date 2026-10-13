@@ -27,7 +27,7 @@ lgnh config          # view config path and current model
 lgnh model           # view current model
 lgnh model <id>      # change model (default: @commit)
 # Translation
-lgnh tr                 # multi-line input; Enter/Shift+Enter newline, Cmd/Ctrl+Enter translate
+lgnh tr                 # multi-line input; Shift+Enter newline, Enter translate
 lgnh tr -i              # repeat translation; result shortcuts: [c] copy, [a] next, [q] exit
 lgnh tr -i [text...]    # translate the initial arguments, then stay interactive
 lgnh tr [text...]       # translate once and print the result after terminal restoration

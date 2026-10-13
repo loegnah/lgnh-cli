@@ -28,14 +28,18 @@ export function TranslateEditor(props: TranslateEditorProps) {
   }
 
   const textareaKeyBindings = [
+    { name: "return", shift: true, action: "newline" as const },
+    { name: "kpenter", shift: true, action: "newline" as const },
+    { name: "linefeed", shift: true, action: "newline" as const },
+    { name: "return", action: "submit" as const },
+    { name: "kpenter", action: "submit" as const },
+    { name: "linefeed", action: "submit" as const },
     { name: "return", ctrl: true, action: "submit" as const },
     { name: "return", super: true, action: "submit" as const },
     { name: "kpenter", ctrl: true, action: "submit" as const },
     { name: "kpenter", super: true, action: "submit" as const },
     { name: "linefeed", ctrl: true, action: "submit" as const },
     { name: "linefeed", super: true, action: "submit" as const },
-    { name: "return", shift: true, action: "newline" as const },
-    { name: "return", action: "newline" as const },
   ];
 
   function handleSubmit() {
@@ -110,7 +114,7 @@ export function TranslateEditor(props: TranslateEditorProps) {
       keyBindings={textareaKeyBindings}
       onSubmit={handleSubmit}
       initialValue={props.initialValue || ""}
-      placeholder="Enter text to translate... (Cmd+Enter or Ctrl+Enter to submit)"
+      placeholder="Enter text to translate... (Enter to submit, Shift+Enter for newline)"
       placeholderColor="#666666"
     />
   );
@@ -357,7 +361,7 @@ export function TranslateScreen(props: TranslateScreenProps) {
           when={phase() === "result"}
           fallback={
             <text fg="#666666">
-              [Enter/Shift+Enter] Newline [Cmd/Ctrl+Enter] Translate [Esc]{" "}
+              [Shift+Enter] Newline [Enter] Translate [Esc]{" "}
               {props.mode === "integrated" ? "Home" : "Exit"} [Ctrl+C] Exit
             </text>
           }
