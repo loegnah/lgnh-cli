@@ -1,5 +1,6 @@
 import { commitCommand } from "./commit.ts";
 import { configCommand, modelCommand } from "./config.ts";
+import { fileServerCommand } from "./file-server.ts";
 import { translateCommand } from "./translate.ts";
 import type { Command } from "./types.ts";
 
@@ -7,6 +8,7 @@ import type { Command } from "./types.ts";
 export const COMMANDS: readonly Command[] = [
   commitCommand,
   translateCommand,
+  fileServerCommand,
   configCommand,
   modelCommand,
 ];

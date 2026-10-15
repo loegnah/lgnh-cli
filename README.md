@@ -43,11 +43,17 @@ lgnh commit -e          # edit generated message before committing
 # Output mode (automatic by default)
 lgnh --plain commit     # force sequential output
 lgnh --tui commit       # request TUI on a TTY, including inside OMP
+
+# Share a directory over HTTP
+lgnh file-server                    # serve the current directory on port 13131
+lgnh file-server ./dist -p 8080     # serve another directory on another port
 ```
 
 Screens entered from home return to the menu with Esc. Visiting Commit does not stage or commit anything: select verification, push and editor options, then explicitly start the workflow. Settings uses the existing config file and model format.
 
 Translation result shortcuts also accept `ㅊ` (copy), `ㅁ` (next), and `ㅂ` (quit); these characters remain ordinary text while editing. Results support keyboard scrolling. Ctrl+C cancels the active subprocess operation and restores the terminal; completed Git changes are not rolled back. Git editors and credential prompts temporarily take ownership of the terminal.
+
+`file-server` runs in the console (no terminal screen) and binds `0.0.0.0`, printing the local and LAN URLs; Ctrl+C stops it. Browsers get a directory listing with view and download links plus drag-and-drop/multi-file upload, while scripts can use `curl -T file.txt http://<host>:13131/sub/file.txt`. Uploads never overwrite an existing file: the name becomes `file (1).txt`. Requests that resolve outside the served directory are refused.
 
 When either stream is non-TTY, commands use plain output instead of a renderer. OMP subprocesses (identified by a non-empty `OMPCODE`) also automatically use plain output, even when connected through a PTY; `TERM=dumb` uses plain output too. Ordinary interactive terminals keep the TUI. Leading `--plain` / `--tui` flags override automatic selection, but `--tui` never opens a renderer on non-TTY streams. Put these flags before the command so translation text and model arguments remain literal. In plain mode, translation needs text arguments or piped input; `tr` without input reports an error instead of waiting on a captured TTY. Redirected translation stdout contains only the result; errors go to stderr with a nonzero exit code.
 
