@@ -6,11 +6,14 @@ import { StepError } from "./errors.ts";
 import { runProcess } from "./process.ts";
 
 const COMMIT_SYSTEM_PROMPT = `Generate a git commit message. English only.
-Format: <type>(<scope>): <subject> (under 72 chars)
-Types: feat, fix, chore, refactor, docs, test, style
-Scope: lowercase keyword of changed area
-Complex changes: empty line then "- " bullet points
-Return raw commit message only, no markdown, no explanations.`;
+Format:
+<type>(<scope>): <clear, simple subject under 72 chars>
+
+- <detailed explanation of what changed and why>
+
+Rules:
+- ALWAYS include at least 1 "- " bullet point with a detailed explanation (at least one full sentence)
+- Return raw commit message only, no markdown fences, no extra commentary.`;
 
 const TRANSLATE_SYSTEM_PROMPT = `You are a bidirectional translator between Korean and English.
 YOUR ONLY TASK AND ACTION IS TRANSLATION.
