@@ -1,4 +1,5 @@
 import { createSignal, onMount, Show, For } from "solid-js";
+import { styleText } from "node:util";
 import { useKeyboard } from "@opentui/solid";
 import {
   runCommitWorkflow,
@@ -26,6 +27,25 @@ const STEP_LABELS: Record<CommitStep, string> = {
   commit: "Commit changes",
   push: "Push to remote",
 };
+
+function formatCommitStdout(message: string, resolvedModel: string, pushTarget?: string): string {
+  const [subject = "", ...rest] = message.trim().split("\n");
+  const body = rest
+    .join("\n")
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => `  ${styleText("gray", line)}`)
+    .join("\n");
+
+  const header = `${styleText(["green", "bold"], "✔ Committed")} ${styleText("dim", `(${resolvedModel})`)}`;
+  const formattedSubject = styleText(["cyan", "bold"], subject);
+  const formattedPush = pushTarget
+    ? `\n\n${styleText(["green", "bold"], "✔ Pushed")} ${styleText("dim", `to ${pushTarget}`)}`
+    : "";
+
+  return `${header}\n\n${formattedSubject}${body ? `\n\n${body}` : ""}${formattedPush}\n`;
+}
 
 export function CommitScreen(props: CommitScreenProps) {
   const [verify, setVerify] = createSignal(props.initialOptions?.verify ?? true);
@@ -123,10 +143,10 @@ export function CommitScreen(props: CommitScreenProps) {
               setPushTarget(result.pushTarget);
             }
             if (props.mode === "direct") {
-              const stdout = `Committed (${result.resolvedModel}): ${result.message}${
-                result.pushTarget ? `\nPushed to ${result.pushTarget}` : ""
-              }\n`;
-              props.onComplete({ exitCode: 0, stdout });
+              props.onComplete({
+                exitCode: 0,
+                stdout: formatCommitStdout(result.message, result.resolvedModel, result.pushTarget),
+              });
               return;
             }
           }
