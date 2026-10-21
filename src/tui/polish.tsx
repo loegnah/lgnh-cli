@@ -2,7 +2,7 @@ import { createSignal, onMount, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import type { TextareaRenderable } from "@opentui/core";
 import { addPolishHistory, loadPolishHistory } from "../history.ts";
-import { polishText } from "../omp.ts";
+import { formatUsage, polishText, type OmpResult } from "../omp.ts";
 import { getModel } from "../config.ts";
 import { formatError } from "../errors.ts";
 import type { PolishScreenProps } from "./screens.ts";
@@ -124,11 +124,8 @@ export function PolishScreen(props: PolishScreenProps) {
   let textareaRef: TextareaRenderable | undefined;
 
   const [phase, setPhase] = createSignal<"input" | "polishing" | "result">("input");
-  const [result, setResult] = createSignal<{ text: string; resolvedModel: string } | null>(null);
-  const [lastSuccessfulResult, setLastSuccessfulResult] = createSignal<{
-    text: string;
-    resolvedModel: string;
-  } | null>(null);
+  const [result, setResult] = createSignal<OmpResult | null>(null);
+  const [lastSuccessfulResult, setLastSuccessfulResult] = createSignal<OmpResult | null>(null);
   const [fallbackNotice, setFallbackNotice] = createSignal<{ from: string; to: string } | null>(
     null,
   );
@@ -338,7 +335,7 @@ export function PolishScreen(props: PolishScreenProps) {
           border={["top"]}
           borderStyle="single"
           borderColor="green"
-          title={` Result (${(result() || lastSuccessfulResult())?.resolvedModel || "Polished"}) `}
+          title={` Result (${(result() || lastSuccessfulResult())?.resolvedModel || "Polished"}${formatUsage((result() || lastSuccessfulResult())?.usage) ? ` · ${formatUsage((result() || lastSuccessfulResult())?.usage)}` : ""}) `}
           titleColor="green"
           flexDirection="column"
           flexGrow={1}

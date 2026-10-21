@@ -75,14 +75,35 @@ function stripFences(text: string): string {
     .trim();
 }
 
+export interface OmpUsage {
+  input: number;
+  output: number;
+  totalTokens: number;
+  cost?: number;
+}
+
+export function formatCost(cost: number): string {
+  if (cost === 0) return "$0";
+  if (cost >= 0.01) return `$${cost.toFixed(4).replace(/0+$/, "").replace(/\.$/, "")}`;
+  return `$${cost.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
+}
+
+export function formatUsage(usage?: OmpUsage): string {
+  if (!usage) return "";
+  const tokens = `${usage.totalTokens.toLocaleString()} tokens (in ${usage.input.toLocaleString()} · out ${usage.output.toLocaleString()})`;
+  return usage.cost !== undefined ? `${tokens} · ${formatCost(usage.cost)}` : tokens;
+}
+
 export interface OmpResult {
   text: string;
   resolvedModel: string;
+  usage?: OmpUsage;
 }
 
 export interface CommitMessageResult {
   message: string;
   resolvedModel: string;
+  usage?: OmpUsage;
 }
 
 async function callOmp(
@@ -139,6 +160,7 @@ async function callOmp(
 
     let rawText = "";
     let resolvedModel = model;
+    let usage: OmpUsage | undefined;
 
     for (const line of output.trim().split("\n")) {
       if (!line) continue;
@@ -156,6 +178,16 @@ async function callOmp(
           } else if (data.message.model) {
             resolvedModel = data.message.model;
           }
+          const u = data.message.usage;
+          if (u && typeof u.totalTokens === "number") {
+            const cost = typeof u.cost === "number" ? u.cost : u.cost?.total;
+            usage = {
+              input: typeof u.input === "number" ? u.input : 0,
+              output: typeof u.output === "number" ? u.output : 0,
+              totalTokens: u.totalTokens,
+              ...(typeof cost === "number" ? { cost } : {}),
+            };
+          }
         }
       } catch {}
     }
@@ -164,7 +196,7 @@ async function callOmp(
     if (!text) {
       throw new StepError("OMP returned an empty response");
     }
-    return { text, resolvedModel };
+    return { text, resolvedModel, ...(usage ? { usage } : {}) };
   }
 
   throw new StepError("No available models found");
@@ -175,12 +207,17 @@ export async function generateCommitMessage(
   onFallback?: (fromModel: string, toModel: string) => void,
   signal?: AbortSignal,
 ): Promise<CommitMessageResult> {
-  const { text, resolvedModel } = await callOmp(COMMIT_SYSTEM_PROMPT, diffText, onFallback, signal);
+  const { text, resolvedModel, usage } = await callOmp(
+    COMMIT_SYSTEM_PROMPT,
+    diffText,
+    onFallback,
+    signal,
+  );
   const message = stripFences(text);
   if (!message) {
     throw new StepError("OMP returned an empty response");
   }
-  return { message, resolvedModel };
+  return { message, resolvedModel, ...(usage ? { usage } : {}) };
 }
 
 export async function translateText(

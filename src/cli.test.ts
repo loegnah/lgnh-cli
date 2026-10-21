@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveDispatch, parseOutputMode, resolveOutputMode } from "./cli.ts";
+import { formatCost, formatUsage } from "./omp.ts";
 
 const repoRoot = join(import.meta.dir, "..");
 const bin = join(repoRoot, "bin", "lgnh-cli.ts");
@@ -108,4 +109,19 @@ test("contradictory mode flags fail before any command runs", async () => {
   expect(await proc.exited, stderr).toBe(1);
   expect(stderr).toContain("--plain and --tui cannot be combined.");
   expect(stdout).not.toContain("Config:");
+});
+
+test("formatCost and formatUsage format token counts and variable-scale USD costs", () => {
+  expect(formatCost(0)).toBe("$0");
+  expect(formatCost(0.03100725)).toBe("$0.031");
+  expect(formatCost(0.0012)).toBe("$0.0012");
+  expect(formatCost(0.00018)).toBe("$0.00018");
+
+  expect(formatUsage()).toBe("");
+  expect(formatUsage({ input: 1200, output: 80, totalTokens: 1280, cost: 0.0012 })).toBe(
+    "1,280 tokens (in 1,200 · out 80) · $0.0012",
+  );
+  expect(formatUsage({ input: 50, output: 10, totalTokens: 60 })).toBe(
+    "60 tokens (in 50 · out 10)",
+  );
 });

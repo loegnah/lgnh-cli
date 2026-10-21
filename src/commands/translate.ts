@@ -1,14 +1,25 @@
 import { formatError } from "../errors.ts";
 import { addTranslateHistory } from "../history.ts";
-import { translateText } from "../omp.ts";
+import { formatUsage, translateText } from "../omp.ts";
 import type { Command, CommandEnv } from "./types.ts";
 
 async function translatePlain(text: string, progress: boolean): Promise<void> {
   try {
-    const { text: translated, resolvedModel } = await translateText(text, (fromModel, toModel) => {
+    const {
+      text: translated,
+      resolvedModel,
+      usage,
+    } = await translateText(text, (fromModel, toModel) => {
       if (progress) console.log(`${fromModel} unavailable → using ${toModel}`);
     });
-    if (progress) console.log(`Translated (${resolvedModel})`);
+    if (progress) {
+      const usageText = formatUsage(usage);
+      console.log(
+        usageText
+          ? `Translated (${resolvedModel}) · ${usageText}`
+          : `Translated (${resolvedModel})`,
+      );
+    }
     console.log(progress ? `\n${translated}\n` : translated);
   } catch (err) {
     console.error(formatError(err));

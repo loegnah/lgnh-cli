@@ -1,4 +1,5 @@
 import { formatError } from "../errors.ts";
+import { formatUsage } from "../omp.ts";
 import { runCommitWorkflow } from "../workflows/commit.ts";
 import type { CommitOptions, WorkflowEvent } from "../workflows/commit.ts";
 import type { Command } from "./types.ts";
@@ -56,9 +57,11 @@ async function runCommitPlain(name: string, options: CommitOptions): Promise<voi
       console.log("Working tree clean.");
       return;
     }
-    console.log(
-      result.pushTarget ? `Committed & pushed to ${result.pushTarget}` : "Committed successfully.",
-    );
+    const summary = result.pushTarget
+      ? `Committed & pushed to ${result.pushTarget}`
+      : "Committed successfully.";
+    const usageText = formatUsage(result.usage);
+    console.log(usageText ? `${summary}\n  📊 ${usageText}` : summary);
   } catch (err) {
     console.error(formatError(err));
     process.exitCode = 1;

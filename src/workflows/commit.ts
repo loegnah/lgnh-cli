@@ -1,8 +1,8 @@
 import { getModel } from "../config.ts";
 import { formatError } from "../errors.ts";
 import { executeCommit, executePush, getStagedDiff } from "../git.ts";
-import { analyzeContext, generateCommitMessage } from "../omp.ts";
-import type { ContextTokenBreakdown } from "../omp.ts";
+import { analyzeContext, formatUsage, generateCommitMessage } from "../omp.ts";
+import type { ContextTokenBreakdown, OmpUsage } from "../omp.ts";
 import { runProjectVerification } from "./verification.ts";
 
 export interface CommitOptions {
@@ -23,7 +23,7 @@ export type WorkflowEvent =
     }
   | { type: "context"; metrics: ContextTokenBreakdown }
   | { type: "fallback"; fromModel: string; toModel: string }
-  | { type: "message"; message: string; resolvedModel: string };
+  | { type: "message"; message: string; resolvedModel: string; usage?: OmpUsage };
 
 export interface WorkflowContext {
   signal?: AbortSignal;
@@ -34,7 +34,13 @@ export interface WorkflowContext {
 
 export type CommitResult =
   | { changed: false }
-  | { changed: true; message: string; resolvedModel: string; pushTarget?: string };
+  | {
+      changed: true;
+      message: string;
+      resolvedModel: string;
+      usage?: OmpUsage;
+      pushTarget?: string;
+    };
 
 export async function runCommitWorkflow(
   options: CommitOptions,
@@ -99,7 +105,7 @@ export async function runCommitWorkflow(
   emit({ type: "context", metrics });
 
   const initialModel = getModel();
-  const { message, resolvedModel } = await runStep(
+  const { message, resolvedModel, usage } = await runStep(
     "generate",
     () =>
       generateCommitMessage(
@@ -109,22 +115,29 @@ export async function runCommitWorkflow(
       ),
     {
       running: `Generating message... (${initialModel})`,
-      done: (value) => `Generated message (${value.resolvedModel})`,
+      done: (value) => {
+        const usageText = formatUsage(value.usage);
+        return usageText
+          ? `Generated message (${value.resolvedModel}) · ${usageText}`
+          : `Generated message (${value.resolvedModel})`;
+      },
     },
   );
 
-  emit({ type: "message", message, resolvedModel });
+  emit({ type: "message", message, resolvedModel, ...(usage ? { usage } : {}) });
 
   await runStep("commit", () => executeCommit(message, options.edit, signal), {
     running: options.edit ? "Opening editor..." : undefined,
     done: () => "Committed",
   });
 
-  if (!options.push) return { changed: true, message, resolvedModel };
+  if (!options.push) {
+    return { changed: true, message, resolvedModel, ...(usage ? { usage } : {}) };
+  }
 
   const pushTarget = await runStep("push", () => executePush(signal), {
     running: "Pushing changes...",
     done: (target) => `Pushed to ${target}`,
   });
-  return { changed: true, message, resolvedModel, pushTarget };
+  return { changed: true, message, resolvedModel, ...(usage ? { usage } : {}), pushTarget };
 }

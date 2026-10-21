@@ -1,14 +1,23 @@
 import { formatError } from "../errors.ts";
 import { addPolishHistory } from "../history.ts";
-import { polishText } from "../omp.ts";
+import { formatUsage, polishText } from "../omp.ts";
 import type { Command, CommandEnv } from "./types.ts";
 
 async function polishPlain(text: string, progress: boolean): Promise<void> {
   try {
-    const { text: polished, resolvedModel } = await polishText(text, (fromModel, toModel) => {
+    const {
+      text: polished,
+      resolvedModel,
+      usage,
+    } = await polishText(text, (fromModel, toModel) => {
       if (progress) console.log(`${fromModel} unavailable → using ${toModel}`);
     });
-    if (progress) console.log(`Polished (${resolvedModel})`);
+    if (progress) {
+      const usageText = formatUsage(usage);
+      console.log(
+        usageText ? `Polished (${resolvedModel}) · ${usageText}` : `Polished (${resolvedModel})`,
+      );
+    }
     console.log(progress ? `\n${polished}\n` : polished);
   } catch (err) {
     console.error(formatError(err));

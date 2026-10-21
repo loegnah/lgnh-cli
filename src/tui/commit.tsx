@@ -8,7 +8,7 @@ import {
   type WorkflowEvent,
 } from "../workflows/commit.ts";
 import { formatError } from "../errors.ts";
-import type { ContextTokenBreakdown } from "../omp.ts";
+import { formatCost, formatUsage, type ContextTokenBreakdown, type OmpUsage } from "../omp.ts";
 import { getModel } from "../config.ts";
 import type { CommitScreenProps } from "./screens.ts";
 
@@ -28,7 +28,12 @@ const STEP_LABELS: Record<CommitStep, string> = {
   push: "Push to remote",
 };
 
-function formatCommitStdout(message: string, resolvedModel: string, pushTarget?: string): string {
+function formatCommitStdout(
+  message: string,
+  resolvedModel: string,
+  usage?: OmpUsage,
+  pushTarget?: string,
+): string {
   const [subject = "", ...rest] = message.trim().split("\n");
   const body = rest
     .join("\n")
@@ -39,12 +44,15 @@ function formatCommitStdout(message: string, resolvedModel: string, pushTarget?:
     .join("\n");
 
   const header = `${styleText(["green", "bold"], "✔ Committed")} ${styleText("dim", `(${resolvedModel})`)}`;
+  const usageLine = usage
+    ? `\n  ${styleText("dim", `${usage.totalTokens.toLocaleString()} tokens (in ${usage.input.toLocaleString()} · out ${usage.output.toLocaleString()})${usage.cost === undefined ? "" : ` · ${styleText("yellow", formatCost(usage.cost))}`}`)}`
+    : "";
   const formattedSubject = styleText(["cyan", "bold"], subject);
   const formattedPush = pushTarget
     ? `\n\n${styleText(["green", "bold"], "✔ Pushed")} ${styleText("dim", `to ${pushTarget}`)}`
     : "";
 
-  return `${header}\n\n${formattedSubject}${body ? `\n\n${body}` : ""}${formattedPush}\n`;
+  return `${header}${usageLine}\n\n${formattedSubject}${body ? `\n\n${body}` : ""}${formattedPush}\n`;
 }
 
 export function CommitScreen(props: CommitScreenProps) {
@@ -59,6 +67,7 @@ export function CommitScreen(props: CommitScreenProps) {
   const [fallback, setFallback] = createSignal<{ fromModel: string; toModel: string } | null>(null);
   const [commitMsg, setCommitMsg] = createSignal<string | null>(null);
   const [resolvedModel, setResolvedModel] = createSignal<string | null>(null);
+  const [usage, setUsage] = createSignal<OmpUsage | null>(null);
   const [pushTarget, setPushTarget] = createSignal<string | null>(null);
   const [cleanTree, setCleanTree] = createSignal(false);
   const [stepList, setStepList] = createSignal<StepInfo[]>([]);
@@ -88,7 +97,7 @@ export function CommitScreen(props: CommitScreenProps) {
     setErrorMessage(null);
     setIsDone(false);
     setCleanTree(false);
-
+    setUsage(null);
     const handleEvent = (event: WorkflowEvent) => {
       if (event.type === "step") {
         setStepList((prev) =>
@@ -110,6 +119,7 @@ export function CommitScreen(props: CommitScreenProps) {
       } else if (event.type === "message") {
         setCommitMsg(event.message);
         setResolvedModel(event.resolvedModel);
+        setUsage(event.usage ?? null);
       }
     };
 
@@ -145,7 +155,12 @@ export function CommitScreen(props: CommitScreenProps) {
             if (props.mode === "direct") {
               props.onComplete({
                 exitCode: 0,
-                stdout: formatCommitStdout(result.message, result.resolvedModel, result.pushTarget),
+                stdout: formatCommitStdout(
+                  result.message,
+                  result.resolvedModel,
+                  result.usage,
+                  result.pushTarget,
+                ),
               });
               return;
             }
@@ -309,7 +324,7 @@ export function CommitScreen(props: CommitScreenProps) {
         <box
           borderStyle="rounded"
           borderColor="green"
-          title={`Generated Commit (${resolvedModel() || "model"})`}
+          title={`Generated Commit (${resolvedModel() || "model"}${usage() ? ` · ${formatUsage(usage()!)}` : ""})`}
           titleColor="green"
           flexDirection="column"
           padding={1}
