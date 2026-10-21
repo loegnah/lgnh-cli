@@ -5,14 +5,30 @@ import { join } from "node:path";
 const MAX_HISTORY = 100;
 
 export function getTranslateHistoryPath(): string {
-  if (process.env.LGNH_HISTORY_PATH) return process.env.LGNH_HISTORY_PATH;
+  return getHistoryPath("translate_history.json", "LGNH_HISTORY_PATH");
+}
+
+export function getPolishHistoryPath(): string {
+  return getHistoryPath("polish_history.json", "LGNH_POLISH_HISTORY_PATH");
+}
+
+function getHistoryPath(filename: string, envVar: string): string {
+  const override = process.env[envVar];
+  if (override) return override;
   const dir = join(homedir(), ".config", "lgnh");
   mkdirSync(dir, { recursive: true });
-  return join(dir, "translate_history.json");
+  return join(dir, filename);
 }
 
 export function loadTranslateHistory(): string[] {
-  const path = getTranslateHistoryPath();
+  return loadHistoryFrom(getTranslateHistoryPath());
+}
+
+export function loadPolishHistory(): string[] {
+  return loadHistoryFrom(getPolishHistoryPath());
+}
+
+function loadHistoryFrom(path: string): string[] {
   if (!existsSync(path)) return [];
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, "utf-8"));
@@ -32,10 +48,18 @@ export function loadTranslateHistory(): string[] {
 }
 
 export function saveTranslateHistory(history: string[]): void {
+  saveHistoryTo(getTranslateHistoryPath(), history);
+}
+
+export function savePolishHistory(history: string[]): void {
+  saveHistoryTo(getPolishHistoryPath(), history);
+}
+
+function saveHistoryTo(path: string, history: string[]): void {
   try {
-    writeFileSync(getTranslateHistoryPath(), JSON.stringify(history), { mode: 0o600 });
+    writeFileSync(path, JSON.stringify(history), { mode: 0o600 });
   } catch {
-    // History is a convenience; a failed write must not break translation.
+    // History is a convenience; a failed write must not break the feature.
   }
 }
 
@@ -45,5 +69,14 @@ export function addTranslateHistory(text: string): string[] {
   if (!trimmed) return history;
   const updated = [...history.filter((entry) => entry !== trimmed), trimmed].slice(-MAX_HISTORY);
   saveTranslateHistory(updated);
+  return updated;
+}
+
+export function addPolishHistory(text: string): string[] {
+  const trimmed = text.trim();
+  const history = loadPolishHistory();
+  if (!trimmed) return history;
+  const updated = [...history.filter((entry) => entry !== trimmed), trimmed].slice(-MAX_HISTORY);
+  savePolishHistory(updated);
   return updated;
 }

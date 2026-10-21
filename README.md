@@ -32,6 +32,12 @@ lgnh tr -i              # repeat translation; result shortcuts: [c] copy, [a] ne
 lgnh tr -i [text...]    # translate the initial arguments, then stay interactive
 lgnh tr [text...]       # translate once and print the result after terminal restoration
 echo "text" | lgnh tr   # pipe support for CLI workflows
+# Polish (same language, natural expression)
+lgnh polish                 # multi-line input; Shift+Enter newline, Enter polish
+lgnh polish -i              # repeat; result shortcuts: [c] copy, [a] next, [q] exit
+lgnh polish -i [text...]    # polish the initial arguments, then stay interactive
+lgnh polish [text...]       # polish once and print the result after terminal restoration
+echo "text" | lgnh polish   # pipe support for CLI workflows
 
 # Run in any git repository
 lgnh commit             # verify project (lint/typecheck), generate message, commit

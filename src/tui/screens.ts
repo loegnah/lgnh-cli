@@ -24,3 +24,10 @@ export interface TranslateScreenProps extends ScreenProps {
   clipboard?: ClipboardService;
   history?: string[];
 }
+
+export interface PolishScreenProps extends ScreenProps {
+  interactive: boolean;
+  initialText?: string;
+  clipboard?: ClipboardService;
+  history?: string[];
+}

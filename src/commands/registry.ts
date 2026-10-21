@@ -2,12 +2,14 @@ import { commitCommand } from "./commit.ts";
 import { configCommand, modelCommand } from "./config.ts";
 import { fileServerCommand } from "./file-server.ts";
 import { translateCommand } from "./translate.ts";
+import { polishCommand } from "./polish.ts";
 import type { Command } from "./types.ts";
 
 // Single place that lists the CLI's commands. Registering a new command is one entry here.
 export const COMMANDS: readonly Command[] = [
   commitCommand,
   translateCommand,
+  polishCommand,
   fileServerCommand,
   configCommand,
   modelCommand,

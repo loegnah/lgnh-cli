@@ -4,6 +4,7 @@ import type { TuiOptions, TuiOutcome } from "./types.ts";
 import type { ScreenMode } from "./screens.ts";
 import type { OperationScope } from "./operations.ts";
 import { TranslateScreen } from "./translate.tsx";
+import { PolishScreen } from "./polish.tsx";
 import { CommitScreen } from "./commit.tsx";
 import { SettingsScreen } from "./settings.tsx";
 
@@ -37,6 +38,22 @@ export const SCREEN_REGISTRY = {
         mode={ctx.mode}
         interactive={ctx.options.screen === "translate" ? ctx.options.interactive : true}
         initialText={ctx.options.screen === "translate" ? ctx.options.text : undefined}
+        clipboard={ctx.clipboard}
+        onComplete={ctx.onComplete}
+        onBackToHome={ctx.onBackToHome}
+        operations={ctx.operations}
+      />
+    ),
+  },
+  polish: {
+    title: "Polish (polish)",
+    desc: "Rewrite text in natural expression, same language",
+    shortcuts: ["p"],
+    render: (ctx) => (
+      <PolishScreen
+        mode={ctx.mode}
+        interactive={ctx.options.screen === "polish" ? ctx.options.interactive : true}
+        initialText={ctx.options.screen === "polish" ? ctx.options.text : undefined}
         clipboard={ctx.clipboard}
         onComplete={ctx.onComplete}
         onBackToHome={ctx.onBackToHome}
