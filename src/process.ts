@@ -2,6 +2,7 @@ export interface ProcessOptions {
   cwd?: string;
   signal?: AbortSignal;
   inherit?: boolean;
+  input?: string;
 }
 
 export interface ProcessResult {
@@ -43,7 +44,7 @@ export async function runProcess(
   args: string[],
   options: ProcessOptions = {},
 ): Promise<ProcessResult> {
-  const { cwd, signal, inherit } = options;
+  const { cwd, signal, inherit, input } = options;
   signal?.throwIfAborted();
 
   // No `detached` and no spawn `signal`: captured commands keep the session and controlling
@@ -52,7 +53,7 @@ export async function runProcess(
   // its children, which then keep the captured pipes open and the reads below never settle.
   const proc = Bun.spawn(args, {
     cwd,
-    stdin: inherit ? "inherit" : "ignore",
+    stdin: input === undefined ? (inherit ? "inherit" : "ignore") : Buffer.from(input),
     stdout: inherit ? "inherit" : "pipe",
     stderr: inherit ? "inherit" : "pipe",
   });

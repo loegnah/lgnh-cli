@@ -1,12 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { devNull, tmpdir } from "node:os";
+import { devNull, homedir } from "node:os";
 import { join } from "node:path";
 import { countTokens } from "gpt-tokenizer";
 
 import { getModelCandidates } from "./config.ts";
 import { StepError } from "./errors.ts";
 import { runProcess } from "./process.ts";
-import { createIsolationExtension } from "./omp-isolation.ts";
+import { ensureIsolationFiles } from "./omp-isolation.ts";
 
 const COMMIT_SYSTEM_PROMPT = `Generate a git commit message. English only.
 Format:
@@ -124,111 +123,103 @@ async function callOmp(
   }
 
   const models = getModelCandidates();
-  const configDir = mkdtempSync(join(tmpdir(), "lgnh-omp-"));
+  const { configPath, extensionPath } = ensureIsolationFiles(
+    join(homedir(), ".config", "lgnh", "omp"),
+  );
+  // Base64 prevents OMP from interpreting the piped text as commands or file references.
+  const request = Buffer.from(JSON.stringify({ instructions: systemPrompt, input })).toString(
+    "base64",
+  );
 
-  try {
-    const configPath = join(configDir, "config.yml");
-    writeFileSync(
-      configPath,
-      "memory:\n  backend: off\nautolearn:\n  enabled: false\nadvisor:\n  enabled: false\ncompaction:\n  enabled: false\nmagicKeywords:\n  enabled: false\nautoResume: false\n",
+  for (const [i, model] of models.entries()) {
+    const {
+      stdout: output,
+      stderr,
+      exitCode,
+    } = await runProcess(
+      [
+        "omp",
+        "-p",
+        "--mode",
+        "json",
+        "--no-tools",
+        "--no-lsp",
+        "--no-skills",
+        "--no-rules",
+        "--no-extensions",
+        "--no-context-files",
+        "--no-prewalk",
+        "--no-session",
+        "--plugin-dir",
+        devNull,
+        "--no-title",
+        "--config",
+        configPath,
+        "--extension",
+        extensionPath,
+        "--system-prompt",
+        systemPrompt,
+        "--model",
+        model,
+      ],
+      { signal, input: request },
     );
-    const extensionPath = join(configDir, "isolation.js");
-    writeFileSync(extensionPath, createIsolationExtension(systemPrompt, input));
 
-    for (const [i, model] of models.entries()) {
-      const {
-        stdout: output,
-        stderr,
-        exitCode,
-      } = await runProcess(
-        [
-          "omp",
-          "-p",
-          "--mode",
-          "json",
-          "--no-tools",
-          "--no-lsp",
-          "--no-skills",
-          "--no-rules",
-          "--no-extensions",
-          "--no-context-files",
-          "--no-prewalk",
-          "--no-session",
-          "--plugin-dir",
-          devNull,
-          "--no-title",
-          "--config",
-          configPath,
-          "--extension",
-          extensionPath,
-          "--system-prompt",
-          systemPrompt,
-          "--model",
-          model,
-          "--",
-          "Process the supplied text.",
-        ],
-        { signal },
-      );
-
-      if (exitCode !== 0) {
-        const isNotFound = /model .* not found/i.test(stderr);
-        const nextModel = models[i + 1];
-        if (isNotFound && nextModel !== undefined) {
-          onFallback?.(model, nextModel);
-          continue;
-        }
-
-        throw new StepError(`OMP failed (exit code ${exitCode})`, stderr.trim() || undefined);
+    if (exitCode !== 0) {
+      const isNotFound = /model .* not found/i.test(stderr);
+      const nextModel = models[i + 1];
+      if (isNotFound && nextModel !== undefined) {
+        onFallback?.(model, nextModel);
+        continue;
       }
 
-      let rawText = "";
-      let resolvedModel = model;
-      let usage: OmpUsage | undefined;
-
-      for (const line of output.trim().split("\n")) {
-        if (!line) continue;
-        try {
-          const data = JSON.parse(line);
-          if (data.type === "message_end" && data.message?.role === "assistant") {
-            const texts = data.message.content
-              ?.filter((c: { type: string; text?: string }) => c.type === "text" && c.text)
-              .map((c: { text: string }) => c.text);
-            if (texts && texts.length > 0) {
-              rawText = texts.join("\n");
-            }
-            if (data.message.provider && data.message.model) {
-              resolvedModel = `${data.message.provider}/${data.message.model}`;
-            } else if (data.message.model) {
-              resolvedModel = data.message.model;
-            }
-            const u = data.message.usage;
-            if (u && typeof u.totalTokens === "number") {
-              const cost = typeof u.cost === "number" ? u.cost : u.cost?.total;
-              usage = {
-                input: typeof u.input === "number" ? u.input : 0,
-                output: typeof u.output === "number" ? u.output : 0,
-                cacheRead: typeof u.cacheRead === "number" ? u.cacheRead : 0,
-                cacheWrite: typeof u.cacheWrite === "number" ? u.cacheWrite : 0,
-                totalTokens: u.totalTokens,
-                ...(typeof cost === "number" ? { cost } : {}),
-              };
-            }
-          }
-        } catch {}
-      }
-
-      const text = (rawText || output).trim();
-      if (!text) {
-        throw new StepError("OMP returned an empty response");
-      }
-      return { text, resolvedModel, ...(usage ? { usage } : {}) };
+      throw new StepError(`OMP failed (exit code ${exitCode})`, stderr.trim() || undefined);
     }
 
-    throw new StepError("No available models found");
-  } finally {
-    rmSync(configDir, { recursive: true, force: true });
+    let rawText = "";
+    let resolvedModel = model;
+    let usage: OmpUsage | undefined;
+
+    for (const line of output.trim().split("\n")) {
+      if (!line) continue;
+      try {
+        const data = JSON.parse(line);
+        if (data.type === "message_end" && data.message?.role === "assistant") {
+          const texts = data.message.content
+            ?.filter((c: { type: string; text?: string }) => c.type === "text" && c.text)
+            .map((c: { text: string }) => c.text);
+          if (texts && texts.length > 0) {
+            rawText = texts.join("\n");
+          }
+          if (data.message.provider && data.message.model) {
+            resolvedModel = `${data.message.provider}/${data.message.model}`;
+          } else if (data.message.model) {
+            resolvedModel = data.message.model;
+          }
+          const u = data.message.usage;
+          if (u && typeof u.totalTokens === "number") {
+            const cost = typeof u.cost === "number" ? u.cost : u.cost?.total;
+            usage = {
+              input: typeof u.input === "number" ? u.input : 0,
+              output: typeof u.output === "number" ? u.output : 0,
+              cacheRead: typeof u.cacheRead === "number" ? u.cacheRead : 0,
+              cacheWrite: typeof u.cacheWrite === "number" ? u.cacheWrite : 0,
+              totalTokens: u.totalTokens,
+              ...(typeof cost === "number" ? { cost } : {}),
+            };
+          }
+        }
+      } catch {}
+    }
+
+    const text = (rawText || output).trim();
+    if (!text) {
+      throw new StepError("OMP returned an empty response");
+    }
+    return { text, resolvedModel, ...(usage ? { usage } : {}) };
   }
+
+  throw new StepError("No available models found");
 }
 
 export async function generateCommitMessage(
