@@ -8,7 +8,7 @@ import {
   type WorkflowEvent,
 } from "../workflows/commit.ts";
 import { formatError } from "../errors.ts";
-import { formatCost, formatUsage, type ContextTokenBreakdown, type OmpUsage } from "../omp.ts";
+import { formatUsage, type ContextTokenBreakdown, type OmpUsage } from "../omp.ts";
 import { getModel } from "../config.ts";
 import type { CommitScreenProps } from "./screens.ts";
 
@@ -44,9 +44,7 @@ function formatCommitStdout(
     .join("\n");
 
   const header = `${styleText(["green", "bold"], "✔ Committed")} ${styleText("dim", `(${resolvedModel})`)}`;
-  const usageLine = usage
-    ? `\n  ${styleText("dim", `${usage.totalTokens.toLocaleString()} tokens (in ${usage.input.toLocaleString()} · out ${usage.output.toLocaleString()})${usage.cost === undefined ? "" : ` · ${styleText("yellow", formatCost(usage.cost))}`}`)}`
-    : "";
+  const usageLine = usage ? `\n  ${styleText("dim", formatUsage(usage))}` : "";
   const formattedSubject = styleText(["cyan", "bold"], subject);
   const formattedPush = pushTarget
     ? `\n\n${styleText(["green", "bold"], "✔ Pushed")} ${styleText("dim", `to ${pushTarget}`)}`

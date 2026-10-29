@@ -6,6 +6,7 @@ import { countTokens } from "gpt-tokenizer";
 import { getModelCandidates } from "./config.ts";
 import { StepError } from "./errors.ts";
 import { runProcess } from "./process.ts";
+import { createIsolationExtension } from "./omp-isolation.ts";
 
 const COMMIT_SYSTEM_PROMPT = `Generate a git commit message. English only.
 Format:
@@ -80,6 +81,8 @@ function stripFences(text: string): string {
 export interface OmpUsage {
   input: number;
   output: number;
+  cacheRead?: number;
+  cacheWrite?: number;
   totalTokens: number;
   cost?: number;
 }
@@ -92,7 +95,9 @@ export function formatCost(cost: number): string {
 
 export function formatUsage(usage?: OmpUsage): string {
   if (!usage) return "";
-  const tokens = `${usage.totalTokens.toLocaleString()} tokens (in ${usage.input.toLocaleString()} · out ${usage.output.toLocaleString()})`;
+  const cacheRead = usage.cacheRead ? ` · cache read ${usage.cacheRead.toLocaleString()}` : "";
+  const cacheWrite = usage.cacheWrite ? ` · cache write ${usage.cacheWrite.toLocaleString()}` : "";
+  const tokens = `${usage.totalTokens.toLocaleString()} tokens (in ${usage.input.toLocaleString()} · out ${usage.output.toLocaleString()}${cacheRead}${cacheWrite})`;
   return usage.cost !== undefined ? `${tokens} · ${formatCost(usage.cost)}` : tokens;
 }
 
@@ -123,7 +128,12 @@ async function callOmp(
 
   try {
     const configPath = join(configDir, "config.yml");
-    writeFileSync(configPath, "memory:\n  backend: off\nautolearn:\n  enabled: false\n");
+    writeFileSync(
+      configPath,
+      "memory:\n  backend: off\nautolearn:\n  enabled: false\nadvisor:\n  enabled: false\ncompaction:\n  enabled: false\nmagicKeywords:\n  enabled: false\nautoResume: false\n",
+    );
+    const extensionPath = join(configDir, "isolation.js");
+    writeFileSync(extensionPath, createIsolationExtension(systemPrompt, input));
 
     for (const [i, model] of models.entries()) {
       const {
@@ -137,6 +147,7 @@ async function callOmp(
           "--mode",
           "json",
           "--no-tools",
+          "--no-lsp",
           "--no-skills",
           "--no-rules",
           "--no-extensions",
@@ -148,12 +159,14 @@ async function callOmp(
           "--no-title",
           "--config",
           configPath,
+          "--extension",
+          extensionPath,
           "--system-prompt",
           systemPrompt,
           "--model",
           model,
           "--",
-          input,
+          "Process the supplied text.",
         ],
         { signal },
       );
@@ -195,6 +208,8 @@ async function callOmp(
               usage = {
                 input: typeof u.input === "number" ? u.input : 0,
                 output: typeof u.output === "number" ? u.output : 0,
+                cacheRead: typeof u.cacheRead === "number" ? u.cacheRead : 0,
+                cacheWrite: typeof u.cacheWrite === "number" ? u.cacheWrite : 0,
                 totalTokens: u.totalTokens,
                 ...(typeof cost === "number" ? { cost } : {}),
               };

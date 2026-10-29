@@ -125,3 +125,12 @@ test("formatCost and formatUsage format token counts and variable-scale USD cost
     "60 tokens (in 50 · out 10)",
   );
 });
+
+test("usage exposes cached tokens that account for the difference from input and output", () => {
+  expect(formatUsage({ input: 2386, output: 71, cacheRead: 5934, totalTokens: 8391 })).toBe(
+    "8,391 tokens (in 2,386 · out 71 · cache read 5,934)",
+  );
+  expect(
+    formatUsage({ input: 50, output: 10, cacheRead: 30, cacheWrite: 60, totalTokens: 150 }),
+  ).toBe("150 tokens (in 50 · out 10 · cache read 30 · cache write 60)");
+});
